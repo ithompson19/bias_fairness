@@ -11,11 +11,13 @@ Adult
     The Adult dataset (https://archive.ics.uci.edu/ml/datasets/adult)
 """
 
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
+
 import numpy as np
 import pandas as pd
-from typing import Dict, Any, List, Tuple
-from pathlib import Path
 from sklearn.preprocessing import LabelEncoder
+
 
 class DataReader:
     """Reads data from training and test data sets and encodes them. Data in the training set can be manipulated to introduce bias.
@@ -72,19 +74,21 @@ class DataReader:
         self.__features: list = list(types.keys())
         
         self.__training_path: Path = Path(training_data_path)
-        if not (self.__training_path.is_file() and training_data_path.endswith('.csv')):
-            raise ValueError("Path to training data file does not exist or is not a .csv file.")
+        if not (self.__training_path.is_file()):
+            raise ValueError("Path to training data file does not exist.")
         
         self.__test_path: Path = Path(test_data_path)
-        if not (self.__test_path.is_file() and test_data_path.endswith('.csv')):
-            raise ValueError("Path to test data file does not exist or is not a .csv file.")
+        if not (self.__test_path.is_file()):
+            raise ValueError("Path to test data file does not exist.")
         
-        if not label_column_names <= self.__features:
-            raise ValueError("Label column names must be a subset of the column names provided in types.")
+        for label_name in label_column_names:
+            if label_name not in self.__features:
+                raise ValueError("Label column names must be a subset of the column names provided in types.")
         self.__label_column_names: List[str] = label_column_names
         
-        if not sensitive_attribute_column_names <= self.__features:
-            raise ValueError("Sensitive attribute column names must be a subset of the column names provided in types.")
+        for sensitive_attribute in sensitive_attribute_column_names:
+            if sensitive_attribute not in self.__features:
+                raise ValueError("Sensitive attribute column names must be a subset of the column names provided in types.")
         self.__sensitive_attribute_column_names: List = sensitive_attribute_column_names
         
     def __read_file(self, is_test: bool) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:

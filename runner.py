@@ -1,13 +1,17 @@
+from fairlearn.reductions import DemographicParity, ExponentiatedGradient
 from sklearn.linear_model import LogisticRegression
-from fairlearn.reductions import ExponentiatedGradient, DemographicParity # Exponentiated Gradient (for Adult) / GridSearch (Worse for Adult)
+
 from data_reader import Adult
+
 
 def main(args):
     # introduce bias in labels
     # get confidence of decision, and flip low confidence rows?
     
     training_data, training_labels, training_sensitive_attributes = Adult.training_data()
+    print(training_data.head())
     test_data, test_labels, test_sensitive_attributes = Adult.test_data()
+    print(test_data.head())
     
     estimator = LogisticRegression(max_iter = 10000, n_jobs = -1)
     
