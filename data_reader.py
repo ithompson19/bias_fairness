@@ -16,7 +16,10 @@ from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
+from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import LabelEncoder
+
+import bias_inducer
 
 
 class DataReader:
@@ -25,29 +28,17 @@ class DataReader:
     Methods
     -------
     training_data() -> Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]
-        Gets and encodes the training data, the label column(s), and the sensitive attribute(s).
-        
-    training_data_historical_bias(TBD) -> Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]
-        TBD
-        
-    training_data_representation_bias(TBD) -> Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]
-        TBD
+        Gets and encodes the training data, the label column, and the sensitive attribute(s).
     
-    training_data_feature_bias(TBD) -> Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]
-        TBD
-    
-    training_data_label_bias(flip_rate: float) -> Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]
-        Gets and encodes the training data, the label column(s), and the sensitive attribute(s). Flips the values of the label column(s) at the rate specified.
-    
-    test_data() -> Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]
-        Gets and encodes the test data, the label column(s), and the sensitive attribute(s).
+    test_data() -> Tuple[pandas.DataFrame, pandas.Series, pandas.DataFrame]
+        Gets and encodes the test data, the label column, and the sensitive attribute(s).
     """
     
     def __init__(self, 
                  types: Dict[str, Any], 
                  training_data_path: str, 
                  test_data_path: str, 
-                 label_column_names: List[str], 
+                 label_column_name: str, 
                  sensitive_attribute_column_names: List[str]) -> None:
         """
         Parameters
@@ -58,8 +49,8 @@ class DataReader:
             Filepath to the training data file.
         test_data_path: str
             Filepath to the test data file.
-        label_column_names: List[str]
-            Names of each of the columns to be considered as labels. Must be a subset of the column names provided in types.
+        label_column_name: str
+            Names of the column to be considered as labels. Must be in the column names provided in types.
         sensitive_attribute_column_names:
             Names of each of the columns to be considered sensitive attributes. Must be a subset of the column names provided in types.
         
@@ -81,17 +72,16 @@ class DataReader:
         if not (self.__test_path.is_file()):
             raise ValueError("Path to test data file does not exist.")
         
-        for label_name in label_column_names:
-            if label_name not in self.__features:
-                raise ValueError("Label column names must be a subset of the column names provided in types.")
-        self.__label_column_names: List[str] = label_column_names
+        if label_column_name not in self.__features:
+            raise ValueError("Label column name must be in the column names provided in types.")
+        self.label_column_name: str = label_column_name
         
         for sensitive_attribute in sensitive_attribute_column_names:
             if sensitive_attribute not in self.__features:
                 raise ValueError("Sensitive attribute column names must be a subset of the column names provided in types.")
-        self.__sensitive_attribute_column_names: List = sensitive_attribute_column_names
+        self.sensitive_attribute_column_names: List = sensitive_attribute_column_names
         
-    def __read_file(self, is_test: bool) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    def __read_file(self, is_test: bool) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
         """Reads the data file at the location of either the training data or test data.
         
         Parameters
@@ -101,8 +91,8 @@ class DataReader:
             
         Returns
         -------
-        Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]
-            The data, the label column(s) of the data, and the sensitive attribute(s) of the data.
+        Tuple[pandas.DataFrame, pandas.Series, pandas.DataFrame]
+            The data, the label column of the data, and the sensitive attribute(s) of the data.
         
         Raises
         ------
@@ -119,8 +109,8 @@ class DataReader:
         except IOError as e:
             t: str = 'Test' if is_test else 'Training'
             raise IOError('{t} file not found at the location specified')
-        labels = df[self.__label_column_names]
-        sensitive_attributes = df[self.__sensitive_attribute_column_names]
+        labels = df[self.label_column_name]
+        sensitive_attributes = df[self.sensitive_attribute_column_names]
         
         return df, labels, sensitive_attributes
     
@@ -143,7 +133,7 @@ class DataReader:
                 df[colName] = self.__encoder.fit_transform(y = df[colName])
         return df
     
-    def __read_encoded_dataframe(self, is_test: bool) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    def __read_encoded_dataframe(self, is_test: bool) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
         """Gets the training or test data, and encodes all non-numeric columns.
         
         Parameters
@@ -153,63 +143,36 @@ class DataReader:
         
         Returns
         -------
-        Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]
-            The encoded data, the encoded label column(s) of the data, and the encoded sensitive attribute(s) of the data.
+        Tuple[pandas.DataFrame, pandas.Series, pandas.DataFrame]
+            The encoded data, the encoded label column of the data, and the encoded sensitive attribute(s) of the data.
         """
         
         data, labels, sensitive_attributes = self.__read_file(is_test = is_test)
         
         data = self.__encode_dataframe(data)
-        labels = self.__encode_dataframe(labels)
+        labels = self.__encode_dataframe(labels.to_frame()).squeeze()
         sensitive_attributes = self.__encode_dataframe(sensitive_attributes)
         
         return data, labels, sensitive_attributes
     
-    def training_data(self) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-        """Gets and encodes the training data, the label column(s), and the sensitive attribute(s).
+    def training_data(self) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
+        """Gets and encodes the training data, the label column, and the sensitive attribute(s).
         
         Returns
         -------
-        Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]
-            The encoded training data, the encoded label column(s) of the data, and the encoded sensitive attribute(s) of the data.
+        Tuple[pandas.DataFrame, pandas.Series, pandas.DataFrame]
+            The encoded training data, the encoded label column of the data, and the encoded sensitive attribute(s) of the data.
         """
         
         return self.__read_encoded_dataframe(is_test = False)
     
-    def training_data_label_bias(self, flip_rate: float) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-        """Gets and encodes the training data, the label column(s), and the sensitive attribute(s), then flips the values in the label column(s) at the rate specified.
-        
-        Parameters
-        ----------
-        flip_rate: float
-            Rate at which values in the label column(s) should be flipped. Valid values range from 0.00 (0% flip rate) to 1.00 (100% flip rate).
+    def test_data(self) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
+        """Gets and encodes the test data, the label column, and the sensitive attribute(s).
         
         Returns
         -------
         Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]
-            The encoded training data, the encoded label column(s) of the data, and the encoded sensitive attribute(s) of the data.
-            
-        Raises
-        ------
-        ValueError
-            If flip_rate is not between 0 and 1, inclusive.
-        """
-        
-        if flip_rate > 1 or flip_rate < 0:
-            raise ValueError('flip_rate must be between 0 and 1 inclusive')
-        data, labels, sensitive_attributes = self.__read_encoded_dataframe(is_test = False)
-        
-        # randomly flip labels
-        
-        return data, labels, sensitive_attributes
-    
-    def test_data(self) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-        """Gets and encodes the test data, the label column(s), and the sensitive attribute(s).
-        
-        Returns
-        -------
-        Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]
-            The encoded test data, the encoded label column(s) of the data, and the encoded sensitive attribute(s) of the data.
+            The encoded test data, the encoded label column of the data, and the encoded sensitive attribute(s) of the data.
         """
         
         return self.__read_encoded_dataframe(is_test = True)
@@ -233,5 +196,5 @@ Adult = DataReader(
         'Target': 'string' },
     training_data_path = './Data/Adult/adult.data',
     test_data_path = './Data/Adult/adult.test',
-    label_column_names = ['Target'],
+    label_column_name = 'Target',
     sensitive_attribute_column_names = ['Race', 'Sex'])
