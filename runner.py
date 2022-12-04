@@ -17,7 +17,7 @@ def main(dataReader: DataReader):
     
     print('Fetching label-biased data')
     lb_tr_data, lb_tr_labels, lb_tr_sensitive_attributes = dataReader.training_data_label_bias(0.8, 0.99, estimator)
-    lb_bl_tr_data, lb_bl_tr_labels, lb_bl_tr_sensitive_attributes = dataReader.training_data_label_bias_blind(0.8)
+    lb_bl_tr_data, lb_bl_tr_labels, lb_bl_tr_sensitive_attributes = dataReader.training_data_label_bias(0.8)
     
     print('\nComparing accuracy of standard model')
     compare_accuracy(tr_data, tr_labels, tr_sensitive_attributes, test_data, test_labels, estimator)

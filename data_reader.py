@@ -22,7 +22,6 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import LabelEncoder
-from sklearn.utils.validation import check_is_fitted
 
 import bias_inducer
 
@@ -43,8 +42,6 @@ class DataReader:
         Gets and encodes the training data, the label column, and the sensitive attribute(s).
     training_data_label_bias(rate: float, threshold: float, model: LogisticRegression = true) -> Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]
         Gets and encodes the training data, the label column, and the sensitive attribute(s). Randomly flips values in the label column with a confidence below the threshold at the specified rate.
-    training_data_label_bias_blind(rate: float) -> Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]
-        Gets and encodes the training data, the label column, and the sensitive attribute(s). Randomly flips values in the label column at the specified rate.
     test_data() -> Tuple[pandas.DataFrame, pandas.Series, pandas.DataFrame]
         Gets and encodes the test data, the label column, and the sensitive attribute(s).
     """
@@ -186,7 +183,7 @@ class DataReader:
         
         return self.__read_encoded_dataframe(is_test = False)
     
-    def training_data_label_bias(self, rate: float, threshold: float, model: LogisticRegression = LogisticRegression(max_iter=10000, n_jobs=-1)) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
+    def training_data_label_bias(self, rate: float, threshold: float = 1, model: LogisticRegression = LogisticRegression(max_iter=10000, n_jobs=-1)) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
         """Gets and encodes the training data, the label column, and the sensitive attribute(s). Randomly flips values in the label column with a confidence below the threshold at the specified rate. 
         
         Parameters
@@ -206,49 +203,20 @@ class DataReader:
         Raises
         ------
         ValueError
-            If the rate is not between 0 and 1 inclusive, or the threshold is not between 0.5 and 1 inclusive.
+            If the rate is not between 0 and 1 inclusive, or the threshold is not between 0 and 1 inclusive.
         """
         
-        if rate < 0 or rate > 1:
+        if not 0 <= rate <= 1:
             raise ValueError('Rate must be between 0 and 1, inclusive.')
-        if threshold < 0.5 or threshold > 1:
-            raise ValueError('Threshold must be between 0.5 and 1, inclusive.')
+        if not -1 <= threshold <= 1:
+            raise ValueError('Threshold must be between -1 and 1, inclusive.')
         
         data, labels, sensitive_attributes = self.__read_encoded_dataframe(is_test = False)
         
-        if not check_is_fitted(model):
+        if not hasattr(model, "classes_"):
             model.fit(X = data, y = labels)
         
-        data = bias_inducer.label_bias(model = model, data = data, label_column_name = self.label_column_name, rate = rate, threshold = threshold, copy_data = False)
-        labels = data[self.label_column_name]
-        
-        return data, labels, sensitive_attributes
-    
-    def training_data_label_bias_blind(self, rate: float) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
-        """Gets and encodes the training data, the label column, and the sensitive attribute(s). Randomly flips values in the label column at the specified rate. 
-        
-        Parameters
-        ----------
-        rate: float
-            The rate at which labels are flipped.
-        
-        Returns
-        -------
-        Tuple[pandas.DataFrame, pandas.Series, pandas.DataFrame]
-            The encoded training data, the encoded label column of the data, and the encoded sensitive attribute(s) of the data.
-        
-        Raises
-        ------
-        ValueError
-            If the rate is not between 0 and 1 inclusive.
-        """
-        
-        if rate < 0 or rate > 1:
-            raise ValueError('Rate must be between 0 and 1, inclusive.')
-        
-        data, labels, sensitive_attributes = self.__read_encoded_dataframe(is_test = False)
-        
-        data = bias_inducer.label_bias_blind(data = data, label_column_name = self.label_column_name, rate = rate, copy_data = False)
+        data = bias_inducer.label_bias(confidence_model = model, data = data, label_column_name = self.label_column_name, rate = rate, confidence_threshold = threshold, copy_data = False)
         labels = data[self.label_column_name]
         
         return data, labels, sensitive_attributes
