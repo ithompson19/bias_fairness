@@ -213,7 +213,7 @@ class DataReader:
         
         data, labels, sensitive_attributes = self.__read_encoded_dataframe(is_test = False)
         
-        if not hasattr(model, "classes_"):
+        if threshold < 1 and not hasattr(model, "classes_"):
             model.fit(X = data, y = labels)
         
         data = bias_inducer.label_bias(confidence_model = model, data = data, label_column_name = self.label_column_name, rate = rate, confidence_threshold = threshold, copy_data = False)

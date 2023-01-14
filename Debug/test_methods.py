@@ -14,4 +14,4 @@ def test_label_bias(dataReader: DataReader, rate: float, threshold: float):
     # print(tr_labels, lb_tr_labels, b)
 
 warnings.filterwarnings('ignore')
-test_label_bias(Debug, 0.5, .5)
+# test_label_bias(Debug, 0.5, .5)
