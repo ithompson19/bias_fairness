@@ -1,8 +1,10 @@
 from typing import List, Tuple, cast
 import numpy as np
 import plotter as plt
+import multiprocessing as mp
 
 from fairlearn.reductions import DemographicParity, ExponentiatedGradient
+from multiprocessing import Process
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
 
@@ -10,6 +12,8 @@ from data_reader import DataReader
 
 
 def compare_label_bias(dataReader: DataReader, flip_interval: float):
+    print(f'Threads available: {mp.cpu_count()}')
+    
     print('Fetching data')
     tr_data, tr_labels, tr_sensitive_attributes = dataReader.training_data()
     test_data, test_labels, test_sensitive_attributes = dataReader.test_data()
