@@ -38,12 +38,16 @@ class DataReader:
     
     Methods
     -------
-    training_data() -> Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]
-        Gets and encodes the training data, the label column, and the sensitive attribute(s).
-    training_data_label_bias(rate: float, threshold: float, model: LogisticRegression = true) -> Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]
-        Gets and encodes the training data, the label column, and the sensitive attribute(s). Randomly flips values in the label column with a confidence below the threshold at the specified rate.
-    test_data() -> Tuple[pandas.DataFrame, pandas.Series, pandas.DataFrame]
-        Gets and encodes the test data, the label column, and the sensitive attribute(s).
+    training_data() -> Tuple[pandas.DataFrame, pandas.Series]
+        Gets and encodes the training data and the label column.
+    training_data_label_bias(rate: float, threshold: float, model: LogisticRegression = true) -> Tuple[pandas.DataFrame, pandas.Series]
+        Gets and encodes the training data and the label column. Randomly flips values in the label column with a confidence below the threshold at the specified rate.
+    test_data() -> Tuple[pandas.DataFrame, pandas.Series]
+        Gets and encodes the test data and the label column.
+    training_sensitive_attributes() -> pandas.DataFrame
+        Gets and encodes the sensitive attribute(s) of the training data.
+    test_sensitive_attributes() -> pandas.DataFrame
+        Gets and encodes the sensitive attribute(s) of the test data.
     """
     
     def __init__(self, 
@@ -172,19 +176,20 @@ class DataReader:
         
         return data, labels, sensitive_attributes
     
-    def training_data(self) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
-        """Gets and encodes the training data, the label column, and the sensitive attribute(s).
+    def training_data(self) -> Tuple[pd.DataFrame, pd.Series]:
+        """Gets and encodes the training data and the label column.
         
         Returns
         -------
-        Tuple[pandas.DataFrame, pandas.Series, pandas.DataFrame]
-            The encoded training data, the encoded label column of the data, and the encoded sensitive attribute(s) of the data.
+        Tuple[pandas.DataFrame, pandas.Series]
+            The encoded training data and the encoded label column of the data.
         """
         
-        return self.__read_encoded_dataframe(is_test = False)
+        data, labels, sensitive_attributes = self.__read_encoded_dataframe(is_test = False)
+        return data, labels
     
-    def training_data_label_bias(self, rate: float, threshold: float = 1, model: LogisticRegression = LogisticRegression(max_iter=10000, n_jobs=-1)) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
-        """Gets and encodes the training data, the label column, and the sensitive attribute(s). Randomly flips values in the label column with a confidence below the threshold at the specified rate. 
+    def training_data_label_bias(self, rate: float, threshold: float = 1, model: LogisticRegression = LogisticRegression(max_iter=10000, n_jobs=-1)) -> Tuple[pd.DataFrame, pd.Series]:
+        """Gets and encodes the training data and the label column. Randomly flips values in the label column with a confidence below the threshold at the specified rate. 
         
         Parameters
         ----------
@@ -197,13 +202,13 @@ class DataReader:
         
         Returns
         -------
-        Tuple[pandas.DataFrame, pandas.Series, pandas.DataFrame]
-            The encoded training data, the encoded label column of the data, and the encoded sensitive attribute(s) of the data.
+        Tuple[pandas.DataFrame, pandas.Series]
+            The encoded training data and the encoded label column of the data.
         
         Raises
         ------
         ValueError
-            If the rate is not between 0 and 1 inclusive, or the threshold is not between 0 and 1 inclusive.
+            If the rate is not between 0 and 1 inclusive, or the threshold is not between -1 and 1 inclusive.
         """
         
         if not 0 <= rate <= 1:
@@ -219,18 +224,39 @@ class DataReader:
         data = bias_inducer.label_bias(confidence_model = model, data = data, label_column_name = self.label_column_name, rate = rate, confidence_threshold = threshold, copy_data = False)
         labels = data[self.label_column_name]
         
-        return data, labels, sensitive_attributes
+        return data, labels
     
-    def test_data(self) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
-        """Gets and encodes the test data, the label column, and the sensitive attribute(s).
+    def test_data(self) -> Tuple[pd.DataFrame, pd.Series]:
+        """Gets and encodes the test data and the label column.
         
         Returns
         -------
-        Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]
-            The encoded test data, the encoded label column of the data, and the encoded sensitive attribute(s) of the data.
+        Tuple[pandas.DataFrame, pandas.DataFrame]
+            The encoded test data and the encoded label column of the data.
         """
         
-        return self.__read_encoded_dataframe(is_test = True)
+        data, labels, sensitive_attributes = self.__read_encoded_dataframe(is_test = True)
+        return data, labels
+
+    def training_sensitive_attributes(self) -> pd.DataFrame:
+        """Gets and encodes the sensitive attribute(s) of the training data.
+        
+        Returns
+        -------
+        pandas.DataFrame
+            The encoded sensitive attribue(s) of the training data.
+        """
+        return self.__read_encoded_dataframe(is_test=False)[2]
+    
+    def test_sensitive_attributes(self) -> pd.DataFrame:
+        """Gets and encodes the sensitive attribute(s) of the test data.
+        
+        Returns
+        -------
+        pandas.DataFrame
+            The encoded sensitive attribue(s) of the test data.
+        """
+        return self.__read_encoded_dataframe(is_test=True)[2]
         
 Adult = DataReader(
     types = {

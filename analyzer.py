@@ -1,99 +1,89 @@
-from typing import List, Tuple, cast
+import pandas as pd
 import numpy as np
-import plotter as plt
 import multiprocessing as mp
 
 from fairlearn.reductions import DemographicParity, ExponentiatedGradient
-from multiprocessing import Process
+from fairlearn.metrics import demographic_parity_ratio
+from functools import partial
+from multiprocessing import Pool
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
 
 from data_reader import DataReader
 
 
-def compare_label_bias(dataReader: DataReader, flip_interval: float):
-    print(f'Threads available: {mp.cpu_count()}')
-    
-    print('Fetching data')
-    tr_data, tr_labels, tr_sensitive_attributes = dataReader.training_data()
-    test_data, test_labels, test_sensitive_attributes = dataReader.test_data()
-    
-    print('Training Logistic Regression model')
-    estimator = LogisticRegression(max_iter = 10000, n_jobs = -1)
-    estimator.fit(X = tr_data, y = tr_labels)
-    
-    flip_rates: List[float] = np.arange(0, 1, flip_interval).tolist()
-    accuracies: List[float] = []
-    accuracies_mitigated: List[float] = []
-    
-    for flip_rate in flip_rates:
-        print(f'Flip rate: {flip_rate:.2f}')
-        if flip_rate == 0:
-            lb_tr_data, lb_tr_labels, lb_tr_sensitive_attributes = tr_data, tr_labels, tr_sensitive_attributes
-            lb_estimator = estimator
-        else:
-            print('\tFetching flipped data')
-            lb_tr_data, lb_tr_labels, lb_tr_sensitive_attributes = dataReader.training_data_label_bias(flip_rate, 1, estimator)
-            
-            print('\tTraining Logistic Regression model with flipped data')
-            lb_estimator = LogisticRegression(max_iter = 10000, n_jobs = -1)
-            lb_estimator.fit(X = lb_tr_data, y = lb_tr_labels)
-        
-        print(f'\tTraining Exponentiated Gradient mitigator{" with flipped data" if flip_rate > 0 else ""}')
-        constraint = DemographicParity(difference_bound = 0.01)
-        mitigator = ExponentiatedGradient(estimator = lb_estimator, constraints = constraint)
-        mitigator.fit(X = lb_tr_data, y = lb_tr_labels, sensitive_features = lb_tr_sensitive_attributes)
-        
-        print('\tPredicting outcomes')
-        prediction = lb_estimator.predict(X = test_data)
-        prediction_mitigated = mitigator.predict(X = test_data)
-        
-        accuracy: float = cast(float, accuracy_score(test_labels, prediction))
-        accuracy_mitigated: float = cast(float, accuracy_score(test_labels, prediction_mitigated))
-        print(f'\tAccuracy: {accuracy:.5f} | {accuracy_mitigated:.5f}')
-        accuracies.append(accuracy)
-        accuracies_mitigated.append(accuracy_mitigated)
-    
-    plt.plot_batch('Accuracy of Constrained and Unconstrained ML Models\nWith Label Flipping Introduced', 'Flip Rate', 'Accuracy', {
-        'Unconstrained': (flip_rates, accuracies),
-        'Demographic Parity': (flip_rates, accuracies_mitigated)
-    })
+result_columns = ['Flip Rate',
+                  'Confidence Threshold', 
+                  'Unconstrained Accuracy', 
+                  'Unconstrained DP Ratio', 
+                  'DP Constrained Accuracy', 
+                  'DP Constrained DP Ratio']
 
-def compare_label_bias_single(dataReader: DataReader):
-    tr_data, tr_labels, tr_sensitive_attributes = dataReader.training_data()
-    test_data, test_labels, test_sensitive_attributes = dataReader.test_data()
-    
-    print('Training Logistic Regression model')
-    estimator = LogisticRegression(max_iter = 10000, n_jobs = -1)
-    estimator.fit(X = tr_data, y = tr_labels)
-    
-    print('Fetching label-biased data')
-    lb_tr_data, lb_tr_labels, lb_tr_sensitive_attributes = dataReader.training_data_label_bias(0.8, 0.99, estimator)
-    lb_bl_tr_data, lb_bl_tr_labels, lb_bl_tr_sensitive_attributes = dataReader.training_data_label_bias(0.8)
-    
-    print('\nComparing accuracy of standard model')
-    __compare_accuracy(tr_data, tr_labels, tr_sensitive_attributes, test_data, test_labels, estimator)
-    
-    print('\nComparing accuracy of label bias')
-    print('Training Logistic Regression model with label-biased data')
-    lb_estimator = LogisticRegression(max_iter = 10000, n_jobs = -1)
-    lb_estimator.fit(X = lb_tr_data, y = lb_tr_labels)
-    __compare_accuracy(lb_tr_data, lb_tr_labels, lb_tr_sensitive_attributes, test_data, test_labels, lb_estimator)
-    
-    print('\nComparing accuracy of blind label bias')
-    print('Training Logistic Regression model with blind label-biased data')
-    lb_bl_estimator = LogisticRegression(max_iter = 10000, n_jobs = -1)
-    lb_bl_estimator.fit(X = lb_bl_tr_data, y = lb_bl_tr_labels)
-    __compare_accuracy(lb_bl_tr_data, lb_bl_tr_labels, lb_bl_tr_sensitive_attributes, test_data, test_labels, lb_bl_estimator)
+def analyze_label_bias(dataReader: DataReader, flip_interval: float, cpu_count: int = mp.cpu_count()):    
+    if __name__ == '__main__':
+        __label_bias_trial(dataReader, flip_interval, cpu_count)
 
-def __compare_accuracy(training_data, training_labels, training_sensitive_attributes, test_data, test_labels, estimator):
-    print('Training Exponentiated Gradient mitigator from estimated model')
+def __label_bias_trial(dataReader: DataReader, flip_interval: float, cpu_count: int = mp.cpu_count()):
+    initial_data, initial_labels = dataReader.training_data()
+    test_data, test_labels = dataReader.test_data()
+    
+    print('Training initial model')
+    initial_estimator = LogisticRegression(max_iter = 10000, n_jobs = -1)
+    initial_estimator.fit(X = initial_data, y = initial_labels)
+    print('Initial model trained')
+    
+    pool: Pool = Pool(cpu_count)
+    variable_args = [(flip_rate, 1) for flip_rate in np.arange(0, 1 + flip_interval, flip_interval).tolist()]
+    dfs = pool.starmap(partial(__label_bias_fetch_train_constrain,
+                               dataReader=dataReader,
+                               initial_data=initial_data,
+                               initial_labels=initial_labels, 
+                               initial_estimator=initial_estimator,
+                               training_sensitive_attributes=dataReader.training_sensitive_attributes(),
+                               test_data=test_data,
+                               test_labels=test_labels,
+                               test_sensitive_attributes=dataReader.test_sensitive_attributes()),
+                       variable_args)
+    results: pd.DataFrame = pd.concat(dfs, ignore_index=True)
+    print('Writing results to file')
+    results.to_csv('./Results/results.csv')
+    
+def __label_bias_fetch_train_constrain(flip_rate: float, 
+                                       confidence_threshold: float, 
+                                       dataReader: DataReader, 
+                                       initial_data: pd.DataFrame, 
+                                       initial_labels: pd.Series, 
+                                       initial_estimator: LogisticRegression, 
+                                       training_sensitive_attributes: pd.DataFrame, 
+                                       test_data: pd.DataFrame, 
+                                       test_labels: pd.Series, 
+                                       test_sensitive_attributes: pd.DataFrame):
+    print(f'Flip rate {flip_rate:.2f}: start')
+    if flip_rate == 0:
+        training_data, training_labels = initial_data, initial_labels
+        estimator = initial_estimator
+    else:
+        training_data, training_labels = dataReader.training_data_label_bias(flip_rate, confidence_threshold, initial_estimator)
+        estimator = LogisticRegression(max_iter = 10000)
+        estimator.fit(X = training_data, y = training_labels)
+    
     constraint = DemographicParity(difference_bound = 0.01)
-    mitigator = ExponentiatedGradient(estimator = estimator, constraints = constraint)
-    mitigator.fit(X = training_data, y = training_labels, sensitive_features = training_sensitive_attributes)
+    mitigator_dp = ExponentiatedGradient(estimator = estimator, constraints = constraint)
+    mitigator_dp.fit(X = training_data, y = training_labels, sensitive_features = training_sensitive_attributes)    
     
-    prediction = estimator.predict(X = test_data)
-    prediction_mitigated = mitigator.predict(X = test_data)
+    prediction_unc = estimator.predict(X = test_data)
+    prediction_dp = mitigator_dp.predict(X = test_data)
     
-    print('Accuracy of LR: {:.5f}'.format(accuracy_score(test_labels, prediction)))
-    print('Accuracy of DP: {:.5f}'.format(accuracy_score(test_labels, prediction_mitigated)))
+    result: pd.DataFrame = pd.DataFrame(columns=result_columns)
+    result.loc[0] = [flip_rate,
+                     confidence_threshold, 
+                     accuracy_score(test_labels, prediction_unc),
+                     demographic_parity_ratio(y_true = test_labels, 
+                                              y_pred = prediction_unc, 
+                                              sensitive_features = test_sensitive_attributes),
+                     accuracy_score(test_labels, prediction_dp),
+                     demographic_parity_ratio(y_true = test_labels, 
+                                              y_pred = prediction_dp, 
+                                              sensitive_features = test_sensitive_attributes)]
+    print(f'Flip rate {flip_rate:.2f}: done')
+    return result
