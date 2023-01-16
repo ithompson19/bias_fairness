@@ -1,7 +1,9 @@
 from typing import Dict, List, Tuple
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 
 
 def plot_batch(title: str, x_label: str, y_label: str, batch: Dict[str, Tuple[List[float], List[float]]]):
@@ -40,4 +42,17 @@ def plot_dp_flip_rate(data: pd.DataFrame = pd.read_csv('./Results/results.csv'))
     plt.ylim(0, 1)
     plt.savefig('./Results/dp_flip_rate.png')
     
-plot_all()
+def p(data: pd.DataFrame = pd.read_csv('./Results/results.csv')):
+    grouped_data = data.groupby(['Trial'], as_index=False).agg(
+        min=pd.NamedAgg(column='Flip Rate', aggfunc='min'),
+        max=pd.NamedAgg(column='Flip Rate', aggfunc='max'),
+        mean=pd.NamedAgg(column='Flip Rate', aggfunc=np.mean)
+    )
+    grouped_data.reset_index(inplace=True)
+    
+    ax = grouped_data.plot(x='Flip Rate', y='Accuracy', c='red')
+    ax.fill_between(x='Flip Rate', y1='min', y2='max', data=grouped_data, color=mpl.colors.to_rgba('red', 0.15))
+    plt.legend()
+    plt.ylim(0, 1)
+    plt.savefig('./Results/accuracy_flip_rate.png')
+# plot_all()

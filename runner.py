@@ -2,11 +2,10 @@ import warnings
 
 import analyzer
 from data_reader import Adult, Debug, Pokemon
-import plotter
 
 def main():
-    analyzer.analyze_label_bias(Adult, 0.1)
-    plotter.plot_all()
+    if __name__ == '__main__':
+        analyzer.analyze_label_bias(Adult, 0.01)
 
 warnings.filterwarnings('ignore')
 main()
