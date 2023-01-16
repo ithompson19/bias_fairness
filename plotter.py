@@ -41,7 +41,7 @@ def plot_accuracy_flip_rate(data: pd.DataFrame = pd.read_csv('./Results/results.
                     grouped_data['DP Constrained Accuracy']['min'], 
                     grouped_data['DP Constrained Accuracy']['max'], 
                     color=mpl.colors.to_rgba('blue', 0.15))
-    plt.plot(grouped_data['Flip Rate'], grouped_data['Unconstrained Accuracy']['mean'], color='blue', label='DP Constrained')
+    plt.plot(grouped_data['Flip Rate'], grouped_data['DP Constrained Accuracy']['mean'], color='blue', label='DP Constrained')
     
     plt.legend()
     plt.savefig('./Results/accuracy_flip_rate.png')
@@ -67,7 +67,7 @@ def plot_dp_flip_rate(data: pd.DataFrame = pd.read_csv('./Results/results.csv'))
                     grouped_data['DP Constrained DP Ratio']['min'], 
                     grouped_data['DP Constrained DP Ratio']['max'], 
                     color=mpl.colors.to_rgba('blue', 0.15))
-    plt.plot(grouped_data['Flip Rate'], grouped_data['Unconstrained DP Ratio']['mean'], color='blue', label='DP Constrained')
+    plt.plot(grouped_data['Flip Rate'], grouped_data['DP Constrained DP Ratio']['mean'], color='blue', label='DP Constrained')
     
     plt.legend()
     plt.savefig('./Results/dp_flip_rate.png')
