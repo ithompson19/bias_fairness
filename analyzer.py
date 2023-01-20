@@ -1,3 +1,4 @@
+from typing import Tuple
 import pandas as pd
 import numpy as np
 import multiprocessing as mp
@@ -20,30 +21,34 @@ result_columns = ['Flip Rate',
                   'DP Constrained DP Ratio']
 
 def analyze_label_bias(dataReader: DataReader, 
-                       flip_interval: float, 
+                       range_interval: float, 
+                       range_max: float = 1,
+                       range_min: float = 0,
                        cpu_count: int = mp.cpu_count(),
                        trial_count: int = 10):
-    results: pd.DataFrame = pd.concat((__label_bias_trial(dataReader, flip_interval, cpu_count, trial_num) for trial_num in range(1, trial_count + 1)), ignore_index=True)
+    results: pd.DataFrame = pd.concat((__label_bias_trial(dataReader, range_interval, range_max, range_min, cpu_count, trial_num) for trial_num in range(1, trial_count + 1)), ignore_index=True)
 
     print('Writing results to file')
     results.to_csv('./Results/results.csv', index=False)
 
 def __label_bias_trial(dataReader: DataReader, 
-                       flip_interval: float, 
-                       cpu_count: int = mp.cpu_count(), 
+                       range_interval: float, 
+                       range_max: float,
+                       range_min: float,
+                       cpu_count: int, 
                        trial_num: int = 1) -> pd.DataFrame:
     initial_data, initial_labels = dataReader.training_data()
     test_data, test_labels = dataReader.test_data()
     
-    print(f'Trial {trial_num}', flush=True)
-    print('\tTraining initial model', flush=True)
+    print(f'Trial {trial_num}:'.ljust(10), 'Initial', sep='', end="\r", flush=True)
     initial_estimator = LogisticRegression(max_iter = 10000, n_jobs = -1)
     initial_estimator.fit(X = initial_data, y = initial_labels)
-    print('\tInitial model trained', flush=True)
+    print(' '*(12 + int((range_max - range_min) / range_interval)), '|', sep='', end="\r", flush=True)
+    print(f'Trial {trial_num}:'.ljust(10), '|', sep='', end='')
     
     pool: Pool = Pool(cpu_count)
-    variable_args = [(flip_rate, 1) for flip_rate in np.arange(0, 1 + flip_interval, flip_interval).tolist()]
-    dfs = pool.starmap(partial(__label_bias_fetch_train_constrain,
+    variable_args = [(flip_rate, 1) for flip_rate in np.arange(range_min, range_max + range_interval, range_interval).tolist()]
+    return_values = pool.starmap(partial(__label_bias_fetch_train_constrain,
                                dataReader=dataReader,
                                initial_data=initial_data,
                                initial_labels=initial_labels, 
@@ -53,8 +58,10 @@ def __label_bias_trial(dataReader: DataReader,
                                test_labels=test_labels,
                                test_sensitive_attributes=dataReader.test_sensitive_attributes()),
                        variable_args)
+    dfs, failures = zip(*return_values)
     trial_result: pd.DataFrame = pd.concat(dfs, ignore_index=True)
     trial_result.insert(0, 'Trial', trial_num)
+    print(f'| Failures: {sum(failures)}', flush=True)
     return trial_result
 
 def __label_bias_fetch_train_constrain(flip_rate: float, 
@@ -66,9 +73,8 @@ def __label_bias_fetch_train_constrain(flip_rate: float,
                                        training_sensitive_attributes: pd.DataFrame, 
                                        test_data: pd.DataFrame, 
                                        test_labels: pd.Series, 
-                                       test_sensitive_attributes: pd.DataFrame) -> pd.DataFrame:
-    print(f'\tFlip rate {flip_rate:.2f}: start', flush=True)
-    while True:
+                                       test_sensitive_attributes: pd.DataFrame) -> Tuple[pd.DataFrame, int]:
+    for failures in range(5):
         try:
             if flip_rate == 0:
                 training_data, training_labels = initial_data, initial_labels
@@ -97,8 +103,7 @@ def __label_bias_fetch_train_constrain(flip_rate: float,
                                                     y_pred = prediction_dp, 
                                                     sensitive_features = test_sensitive_attributes)]
         except:
-            print(f'\tFlip rate {flip_rate:.2f}: failed. Attempting again', flush=True)
             continue
         break
-    print(f'\tFlip rate {flip_rate:.2f}: done', flush=True)
-    return result
+    print('#' if failures < 4 else 'X', end='', flush=True)
+    return result, failures
