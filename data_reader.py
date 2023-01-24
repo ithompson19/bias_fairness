@@ -18,6 +18,7 @@ Debug
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+import constants as const
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
@@ -101,6 +102,86 @@ class DataReader:
                 raise ValueError("Sensitive attribute column names must be a subset of the column names provided in types.")
         self.sensitive_attribute_column_names: List = sensitive_attribute_column_names
         
+    def training_data(self) -> Tuple[pd.DataFrame, pd.Series]:
+        """Gets and encodes the training data and the label column.
+        
+        Returns
+        -------
+        Tuple[pandas.DataFrame, pandas.Series]
+            The encoded training data and the encoded label column of the data.
+        """
+        
+        return self.__read_encoded_dataframe(is_test = False)[:2]
+    
+    def training_data_label_bias(self, rate: float, threshold: float = 1, model: LogisticRegression = LogisticRegression(max_iter=const.MAX_ITER, n_jobs=const.N_JOBS)) -> Tuple[pd.DataFrame, pd.Series]:
+        """Gets and encodes the training data and the label column. Randomly flips values in the label column with a confidence below the threshold at the specified rate. 
+        
+        Parameters
+        ----------
+        rate: float
+            The rate at which labels are flipped.
+        threshold: float
+            The confidence threshold under which labels may be flipped.
+        model: LogisticRegression, optional
+            Logistic Regression model on which the confidences are based (default is new LogisticRegression). Fitted to dataset within method if not fitted already.
+        
+        Returns
+        -------
+        Tuple[pandas.DataFrame, pandas.Series]
+            The encoded training data and the encoded label column of the data.
+        
+        Raises
+        ------
+        ValueError
+            If the rate is not between 0 and 1 inclusive, or the threshold is not between -1 and 1 inclusive.
+        """
+        
+        if not 0 <= rate <= 1:
+            raise ValueError('Rate must be between 0 and 1, inclusive.')
+        if not -1 <= threshold <= 1:
+            raise ValueError('Threshold must be between -1 and 1, inclusive.')
+        
+        data, labels, _ = self.__read_encoded_dataframe(is_test = False)
+        
+        if threshold < 1 and not hasattr(model, "classes_"):
+            model.fit(X = data, y = labels)
+        
+        data = bias_inducer.label_bias(confidence_model = model, data = data, label_column_name = self.label_column_name, rate = rate, confidence_threshold = threshold, copy_data = False)
+        labels = data[self.label_column_name]
+        
+        return data, labels
+    
+    def test_data(self) -> Tuple[pd.DataFrame, pd.Series]:
+        """Gets and encodes the test data and the label column.
+        
+        Returns
+        -------
+        Tuple[pandas.DataFrame, pandas.DataFrame]
+            The encoded test data and the encoded label column of the data.
+        """
+        
+        return self.__read_encoded_dataframe(is_test = True)[:2]
+
+    def training_sensitive_attributes(self) -> pd.DataFrame:
+        """Gets and encodes the sensitive attribute(s) of the training data.
+        
+        Returns
+        -------
+        pandas.DataFrame
+            The encoded sensitive attribue(s) of the training data.
+        """
+        return self.__read_encoded_dataframe(is_test=False)[2]
+    
+    def test_sensitive_attributes(self) -> pd.DataFrame:
+        """Gets and encodes the sensitive attribute(s) of the test data.
+        
+        Returns
+        -------
+        pandas.DataFrame
+            The encoded sensitive attribue(s) of the test data.
+        """
+        return self.__read_encoded_dataframe(is_test=True)[2]
+    
     def __read_file(self, is_test: bool) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
         """Reads the data file at the location of either the training data or test data.
         
@@ -127,7 +208,7 @@ class DataReader:
                             engine='python', 
                             keep_default_na=False,
                             skiprows = self.__test_data_line_skip if is_test else self.__training_data_line_skip)
-        except IOError as e:
+        except IOError as _:
             t: str = 'Test' if is_test else 'Training'
             raise IOError('{t} file not found at the location specified')
         labels = df[self.label_column_name]
@@ -175,147 +256,7 @@ class DataReader:
         sensitive_attributes = self.__encode_dataframe(sensitive_attributes)
         
         return data, labels, sensitive_attributes
-    
-    def training_data(self) -> Tuple[pd.DataFrame, pd.Series]:
-        """Gets and encodes the training data and the label column.
         
-        Returns
-        -------
-        Tuple[pandas.DataFrame, pandas.Series]
-            The encoded training data and the encoded label column of the data.
-        """
-        
-        data, labels, sensitive_attributes = self.__read_encoded_dataframe(is_test = False)
-        return data, labels
-    
-    def training_data_label_bias(self, rate: float, threshold: float = 1, model: LogisticRegression = LogisticRegression(max_iter=10000, n_jobs=-1)) -> Tuple[pd.DataFrame, pd.Series]:
-        """Gets and encodes the training data and the label column. Randomly flips values in the label column with a confidence below the threshold at the specified rate. 
-        
-        Parameters
-        ----------
-        rate: float
-            The rate at which labels are flipped.
-        threshold: float
-            The confidence threshold under which labels may be flipped.
-        model: LogisticRegression, optional
-            Logistic Regression model on which the confidences are based (default is new LogisticRegression). Fitted to dataset within method if not fitted already.
-        
-        Returns
-        -------
-        Tuple[pandas.DataFrame, pandas.Series]
-            The encoded training data and the encoded label column of the data.
-        
-        Raises
-        ------
-        ValueError
-            If the rate is not between 0 and 1 inclusive, or the threshold is not between -1 and 1 inclusive.
-        """
-        
-        if not 0 <= rate <= 1:
-            raise ValueError('Rate must be between 0 and 1, inclusive.')
-        if not -1 <= threshold <= 1:
-            raise ValueError('Threshold must be between -1 and 1, inclusive.')
-        
-        data, labels, sensitive_attributes = self.__read_encoded_dataframe(is_test = False)
-        
-        if threshold < 1 and not hasattr(model, "classes_"):
-            model.fit(X = data, y = labels)
-        
-        data = bias_inducer.label_bias(confidence_model = model, data = data, label_column_name = self.label_column_name, rate = rate, confidence_threshold = threshold, copy_data = False)
-        labels = data[self.label_column_name]
-        
-        return data, labels
-    
-    def test_data(self) -> Tuple[pd.DataFrame, pd.Series]:
-        """Gets and encodes the test data and the label column.
-        
-        Returns
-        -------
-        Tuple[pandas.DataFrame, pandas.DataFrame]
-            The encoded test data and the encoded label column of the data.
-        """
-        
-        data, labels, sensitive_attributes = self.__read_encoded_dataframe(is_test = True)
-        return data, labels
-
-    def training_sensitive_attributes(self) -> pd.DataFrame:
-        """Gets and encodes the sensitive attribute(s) of the training data.
-        
-        Returns
-        -------
-        pandas.DataFrame
-            The encoded sensitive attribue(s) of the training data.
-        """
-        return self.__read_encoded_dataframe(is_test=False)[2]
-    
-    def test_sensitive_attributes(self) -> pd.DataFrame:
-        """Gets and encodes the sensitive attribute(s) of the test data.
-        
-        Returns
-        -------
-        pandas.DataFrame
-            The encoded sensitive attribue(s) of the test data.
-        """
-        return self.__read_encoded_dataframe(is_test=True)[2]
-        
-Adult = DataReader(
-    types = {
-        'Age': np.int64, 
-        'Workclass': 'string',
-        'fnlwgt': np.int64,
-        'Education': 'string',
-        'Education-Num': np.int64,
-        'Marital Status': 'string',
-        'Occupation': 'string',
-        'Relationship': 'string',
-        'Race': 'string',
-        'Sex': 'string',
-        'Capital Gain': np.int64,
-        'Capital Loss': np.int64,
-        'Hours per week': np.int64,
-        'Country': 'string',
-        'Target': 'string' },
-    training_data_path = './Data/Adult/adult.data',
-    training_data_line_skip = 0,
-    test_data_path = './Data/Adult/adult.test',
-    test_data_line_skip = 1,
-    label_column_name = 'Target',
-    sensitive_attribute_column_names = ['Race', 'Sex'])
-
-Pokemon = DataReader(
-    types = {
-        'Number': np.int64,
-        'Name': 'string',
-        'Type1': 'string',
-        'Type2': 'string',
-        'Total': np.int64,
-        'HP': np.int64,
-        'Attack': np.int64,
-        'Defense': np.int64,
-        'Sp. Atk': np.int64,
-        'Sp. Def': np.int64,
-        'Speed': np.int64,
-        'Generation': np.int64,
-        'Legendary': 'string'
-    },
-    training_data_path = './Data/Pokemon/pokemon.data',
-    training_data_line_skip = 0,
-    test_data_path = './Data/Pokemon/pokemon.test',
-    test_data_line_skip = 1,
-    label_column_name = 'Legendary',
-    sensitive_attribute_column_names = ['Total', 'Generation']
-)
-
-Debug = DataReader(
-    types = {
-        'A': np.int64,
-        'B': np.int64,
-        'C': np.int64
-    },
-    training_data_path = './Data/Debug/debug.data',
-    training_data_line_skip = 0,
-    test_data_path = './Data/Debug/debug.test',
-    test_data_line_skip = 1,
-    label_column_name = 'C',
-    sensitive_attribute_column_names = ['B']
-)
+Adult = DataReader(*const.ADULT_PARAMS)
+Pokemon = DataReader(*const.POKEMON_PARAMS)
+Debug = DataReader(*const.DEBUG_PARAMS)

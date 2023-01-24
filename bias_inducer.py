@@ -5,6 +5,7 @@ Methods
 label_bias(model: LogisticRegression, data: pd.DataFrame, label_column_name: str, rate: float, threshold: float, copy_data: bool = True) -> pd.DataFrame:
     Introduces label bias in the provided dataframe. Randomly flips labels under the confidence threshold as determined by the model, at the rate specified.
 """
+import constants as const
 import random
 from typing import Dict, List, Tuple, cast
 
@@ -18,7 +19,7 @@ def label_bias(data: pd.DataFrame,
                label_column_name: str,
                rate: float | Tuple[float, float] | Dict[str, Dict[str, float]] | Dict[str, Dict[str, Tuple[float, float]]], 
                copy_data: bool = True,
-               confidence_model: LogisticRegression = LogisticRegression(max_iter = 10000, n_jobs = -1), 
+               confidence_model: LogisticRegression = LogisticRegression(max_iter = const.MAX_ITER, n_jobs = const.N_JOBS), 
                confidence_threshold: float = 1.0) -> pd.DataFrame:
     """Introduces label bias in the provided dataframe. Randomly flips labels under the confidence threshold as determined by the model, at the rate specified.
     
@@ -140,7 +141,7 @@ def __flip_labels(data: pd.DataFrame,
     flippable_indexes: List[int]
         List of all of the indexes of labels that are available to flip.
     """
-    for i in range(int(len(flippable_indexes) * rate)):
+    for _ in range(int(len(flippable_indexes) * rate)):
             flip_index: int = random.choice(flippable_indexes)
             data.at[flip_index, label_column_name] = 1 - data.at[flip_index, label_column_name]
             flippable_indexes.remove(flip_index)

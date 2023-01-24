@@ -1,75 +1,41 @@
-from typing import Dict, List, Tuple
-
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import pandas as pd
-import numpy as np
+import file_handler
+import constants as const
 
 
-def plot_batch(title: str, x_label: str, y_label: str, batch: Dict[str, Tuple[List[float], List[float]]]):
-    plt.title(title)
-    plt.xlabel(x_label)
-    plt.ylabel(y_label)
-    for line_label, line_values in batch.items():
-        plt.plot(line_values[0], line_values[1], label = line_label)
-    plt.legend()
-    plt.ylim(0, 1)
-    plt.savefig('accuracy.png')
-
-def plot_all(data: pd.DataFrame = pd.read_csv('./Results/results.csv')):
-    plot_accuracy_flip_rate(data)
-    plot_dp_flip_rate(data)
+def plot_all(subdirectory: str = ''):
+    data: pd.DataFrame = file_handler.read_from_subdirectory(subdirectory)
+    plot_fliprate_accuracy(subdirectory, data)
+    plot_fliprate_dp(subdirectory, data)
     
-def plot_accuracy_flip_rate(data: pd.DataFrame = pd.read_csv('./Results/results.csv')):
+def plot_fliprate_accuracy(subdirectory: str = '', data: pd.DataFrame = None):
+    __plot(title='Accuracy', x='Flip Rate', y='Accuracy', subdirectory=subdirectory, data=data)
+    
+def plot_fliprate_dp(subdirectory: str = '', data: pd.DataFrame = None):
+    __plot(title='Demographic Parity', x='Flip Rate', y='DP Ratio', subdirectory=subdirectory, data=data)
+    
+def __plot(title: str, x: str, y: str, subdirectory: str, data: pd.DataFrame = None):
+    if data.empty:
+        data = file_handler.read_from_subdirectory(subdirectory)
+    
     plt.figure()
-    plt.title('Accuracy of Fairness Constrained and Unconstrained ML Models')
-    plt.xlabel('Label Flip rate')
-    plt.ylabel('Accuracy')
-    plt.ylim(0, 1)
+    plt.title(f'{title} of Fairness Constrained and Unconstrained ML Models')
+    plt.xlabel(x)
+    plt.ylabel(y)
+    _, ax = plt.subplots()
     
-    fig, ax = plt.subplots()
-    grouped_data = data.groupby('Flip Rate', as_index=False)[['Unconstrained Accuracy', 'DP Constrained Accuracy']].agg({
-        'Unconstrained Accuracy':['min', 'max', 'mean'],
-        'DP Constrained Accuracy':['min', 'max', 'mean']})
+    keys = [f'{key} {y}' for key in const.LINES]
+            
+    grouped_data = data.groupby(x, as_index=False)[keys].agg({key: ['min', 'max', 'mean'] for key in keys})
     
-    ax.fill_between(grouped_data['Flip Rate'], 
-                    grouped_data['Unconstrained Accuracy']['min'], 
-                    grouped_data['Unconstrained Accuracy']['max'], 
-                    color=mpl.colors.to_rgba('red', 0.15))
-    plt.plot(grouped_data['Flip Rate'], grouped_data['Unconstrained Accuracy']['mean'], color='red', label='Unconstrained')
-    ax.fill_between(grouped_data['Flip Rate'], 
-                    grouped_data['DP Constrained Accuracy']['min'], 
-                    grouped_data['DP Constrained Accuracy']['max'], 
-                    color=mpl.colors.to_rgba('blue', 0.15))
-    plt.plot(grouped_data['Flip Rate'], grouped_data['DP Constrained Accuracy']['mean'], color='blue', label='DP Constrained')
-    
+    for label, color in const.LINES.items():
+        ax.fill_between(grouped_data[x], 
+                        grouped_data[f'{label} {y}']['min'], 
+                        grouped_data[f'{label} {y}']['max'], 
+                        color=mpl.colors.to_rgba(color, 0.15))
+        plt.plot(grouped_data[x], grouped_data[f'{label} {y}']['mean'], color=color, label=label)
+        
     plt.legend()
-    plt.savefig('./Results/accuracy_flip_rate.png')
-    
-def plot_dp_flip_rate(data: pd.DataFrame = pd.read_csv('./Results/results.csv')):
-    plt.figure()
-    plt.title('Demographic Parity of Fairness Constrained and Unconstrained ML Models')
-    plt.xlabel('Label Flip rate')
-    plt.ylabel('Demographic Parity Ratio')
-    plt.ylim(0, 1)
-    
-    fig, ax = plt.subplots()
-    grouped_data = data.groupby('Flip Rate', as_index=False)[['Unconstrained DP Ratio', 'DP Constrained DP Ratio']].agg({
-        'Unconstrained DP Ratio':['min', 'max', 'mean'],
-        'DP Constrained DP Ratio':['min', 'max', 'mean']})
-    
-    ax.fill_between(grouped_data['Flip Rate'], 
-                    grouped_data['Unconstrained DP Ratio']['min'], 
-                    grouped_data['Unconstrained DP Ratio']['max'], 
-                    color=mpl.colors.to_rgba('red', 0.15))
-    plt.plot(grouped_data['Flip Rate'], grouped_data['Unconstrained DP Ratio']['mean'], color='red', label='Unconstrained')
-    ax.fill_between(grouped_data['Flip Rate'], 
-                    grouped_data['DP Constrained DP Ratio']['min'], 
-                    grouped_data['DP Constrained DP Ratio']['max'], 
-                    color=mpl.colors.to_rgba('blue', 0.15))
-    plt.plot(grouped_data['Flip Rate'], grouped_data['DP Constrained DP Ratio']['mean'], color='blue', label='DP Constrained')
-    
-    plt.legend()
-    plt.savefig('./Results/dp_flip_rate.png')
-    
-plot_all()
+    plt.savefig(file_handler.full_path_from_subdirectory(subdirectory, f'{x.replace(" ", "").lower()}_{y.replace(" ", "").lower()}.png'))
