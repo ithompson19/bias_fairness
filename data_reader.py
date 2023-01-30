@@ -9,17 +9,14 @@ Objects
 -------
 Adult
     The Adult dataset (https://archive.ics.uci.edu/ml/datasets/adult)
-Pokemon
-    Data from the first 6 generations of Pokemon (https://gist.github.com/armgilles/194bcff35001e7eb53a2a8b441e8b2c6)
 Debug
     Simple dataset meant for debugging.
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, cast
 
 import constants as const
-import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import LabelEncoder
@@ -113,7 +110,10 @@ class DataReader:
         
         return self.__read_encoded_dataframe(is_test = False)[:2]
     
-    def training_data_label_bias(self, rate: float, threshold: float = 1, model: LogisticRegression = LogisticRegression(max_iter=const.MAX_ITER, n_jobs=const.N_JOBS)) -> Tuple[pd.DataFrame, pd.Series]:
+    def training_data_label_bias(self, 
+                                 flip_rate: float | Tuple[float, float] | Dict[str, Dict[str, float]] | Dict[str, Dict[str, Tuple[float, float]]], 
+                                 confidence_threshold: float = 1, 
+                                 initial_model: LogisticRegression = LogisticRegression(max_iter=const.MAX_ITER, n_jobs=const.N_JOBS)) -> Tuple[pd.DataFrame, pd.Series]:
         """Gets and encodes the training data and the label column. Randomly flips values in the label column with a confidence below the threshold at the specified rate. 
         
         Parameters
@@ -135,18 +135,22 @@ class DataReader:
         ValueError
             If the rate is not between 0 and 1 inclusive, or the threshold is not between -1 and 1 inclusive.
         """
-        
-        if not 0 <= rate <= 1:
-            raise ValueError('Rate must be between 0 and 1, inclusive.')
-        if not -1 <= threshold <= 1:
+        if not -1 <= confidence_threshold <= 1:
             raise ValueError('Threshold must be between -1 and 1, inclusive.')
         
-        data, labels, _ = self.__read_encoded_dataframe(is_test = False)
+        data, labels, _ = self.__read_file(is_test = False)
         
-        if threshold < 1 and not hasattr(model, "classes_"):
-            model.fit(X = data, y = labels)
+        if confidence_threshold < 1 and not hasattr(initial_model, "classes_"):
+            initial_model.fit(X = data, y = labels)
+        full_rate: Dict[str, Dict[str, Tuple[float, float]]] = self.fill_incomplete_rate_object(flip_rate, confidence_threshold)
         
-        data = bias_inducer.label_bias(confidence_model = model, data = data, label_column_name = self.label_column_name, rate = rate, confidence_threshold = threshold, copy_data = False)
+        data = bias_inducer.label_bias(data=data,
+                                       label_column_name=self.label_column_name,
+                                       flip_rate=full_rate,
+                                       copy_data=False,
+                                       confidence_model=initial_model,
+                                       confidence_threshold=confidence_threshold)
+        data = self.__encode_dataframe(data)
         labels = data[self.label_column_name]
         
         return data, labels
@@ -182,6 +186,66 @@ class DataReader:
         """
         return self.__read_encoded_dataframe(is_test=True)[2]
     
+    def fill_incomplete_rate_object(self, 
+                                    flip_rate: float | Tuple[float, float] | Dict[str, Dict[str, float]] | Dict[str, Dict[str, Tuple[float, float]]],
+                                    confidence_threshold: float) -> Dict[str, Dict[str, Tuple[float, float]]]:
+        full_rate: Dict[str, Dict[str, Tuple[float, float]]] = {}
+        if type(flip_rate) == float:
+            flip_rate = cast(float, flip_rate)
+            if not 0 <= flip_rate <= 1:
+                raise ValueError('Flip rate must be between 0 and 1, inclusive.')
+            if confidence_threshold < flip_rate:
+                raise ValueError('Confidence threshold must be greater than or equal to flip rate.')
+            for attribute_name in self.sensitive_attribute_column_names:
+                if attribute_name not in full_rate:
+                    full_rate[attribute_name] = {}
+                for attribute_value in self.__get_sensitive_attribute_vals(attribute_name):
+                    full_rate[attribute_name][attribute_value] = (flip_rate, flip_rate)
+                    
+        elif type(flip_rate) == Tuple[float, float]:
+            flip_rate = cast(Tuple[float, float], flip_rate)
+            if not all(0 <= rate <= 1 for rate in flip_rate):
+                raise ValueError('Flip rate must be between 0 and 1, inclusive.')
+            if any(confidence_threshold < rate for rate in flip_rate):
+                raise ValueError('Confidence threshold must be greater than or equal to flip rate.')
+            for attribute_name in self.sensitive_attribute_column_names:
+                if attribute_name not in full_rate:
+                    full_rate[attribute_name] = {}
+                for attribute_value in self.__get_sensitive_attribute_vals(attribute_name):
+                    full_rate[attribute_name][attribute_value] = flip_rate
+                    
+        elif type(flip_rate) == Dict[str, Dict[str, float]]:
+            flip_rate = cast(Dict[str, Dict[str, float]], flip_rate)
+            for attribute_name in self.sensitive_attribute_column_names:
+                if attribute_name not in full_rate:
+                    full_rate[attribute_name] = {}
+                for attribute_value in self.__get_sensitive_attribute_vals(attribute_name):
+                    if attribute_name in flip_rate and attribute_value in flip_rate[attribute_name]:
+                        if not 0 <= flip_rate[attribute_name][attribute_value] <= 1:
+                            raise ValueError('Rate must be between 0 and 1, inclusive.')
+                        if confidence_threshold < flip_rate[attribute_name][attribute_value]:
+                            raise ValueError('Confidence threshold must be greater than or equal to flip rate.')
+                        full_rate[attribute_name][attribute_value] = (flip_rate[attribute_name][attribute_value], flip_rate[attribute_name][attribute_value])
+                    else:
+                        full_rate[attribute_name][attribute_value]=  (0, 0)
+                        
+        elif type(flip_rate) == Dict[str, Dict[str, Tuple[float, float]]]:
+            flip_rate = cast(Dict[str, Dict[str, Tuple[float, float]]], flip_rate)
+            for attribute_name in self.sensitive_attribute_column_names:
+                if attribute_name not in full_rate:
+                    full_rate[attribute_name] = {}
+                for attribute_value in self.__get_sensitive_attribute_vals(attribute_name):
+                    if attribute_name in flip_rate and attribute_value in flip_rate[attribute_name]:
+                        if not all(0 <= rate <= 1 for rate in flip_rate[attribute_name][attribute_value]):
+                            raise ValueError('Rate must be between 0 and 1, inclusive.')
+                        if any(confidence_threshold < rate for rate in flip_rate[attribute_name][attribute_value]):
+                            raise ValueError('Confidence threshold must be greater than or equal to flip rate.')
+                        full_rate[attribute_name][attribute_value] = flip_rate[attribute_name][attribute_value]
+                    else:
+                        full_rate[attribute_name][attribute_value]=  (0, 0)
+                        
+        return full_rate
+    
     def __read_file(self, is_test: bool) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
         """Reads the data file at the location of either the training data or test data.
         
@@ -209,10 +273,17 @@ class DataReader:
                             keep_default_na=False,
                             skiprows = self.__test_data_line_skip if is_test else self.__training_data_line_skip)
         except IOError as _:
-            t: str = 'Test' if is_test else 'Training'
-            raise IOError('{t} file not found at the location specified')
+            raise IOError(f'{"Test" if is_test else "Training"} file not found at the location specified')
         labels = df[self.label_column_name]
         sensitive_attributes = df[self.sensitive_attribute_column_names]
+        
+        self.__sens_attr_values = {}
+        for attr_name in self.sensitive_attribute_column_names:
+            attr_values = df[attr_name].unique()
+            for existing_attr_name in self.__sens_attr_values:
+                if frozenset(self.__sens_attr_values[existing_attr_name]).intersection(attr_values):
+                    raise ValueError('Sensitive attribute values must not be shared across sensitive attribute columns.')
+            self.__sens_attr_values[attr_name] = df[attr_name].unique()
         
         return df, labels, sensitive_attributes
     
@@ -256,7 +327,11 @@ class DataReader:
         sensitive_attributes = self.__encode_dataframe(sensitive_attributes)
         
         return data, labels, sensitive_attributes
+    
+    def __get_sensitive_attribute_vals(self, attribute_name: str):
+        if attribute_name not in self.sensitive_attribute_column_names:
+            raise ValueError(f'{attribute_name} is not a sensitive attribute.')
+        return self.__sens_attr_values[attribute_name]
         
 Adult = DataReader(*const.ADULT_PARAMS)
-Pokemon = DataReader(*const.POKEMON_PARAMS)
 Debug = DataReader(*const.DEBUG_PARAMS)

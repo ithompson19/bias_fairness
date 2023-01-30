@@ -17,7 +17,7 @@ from sklearn.linear_model import LogisticRegression
 
 def label_bias(data: pd.DataFrame, 
                label_column_name: str,
-               rate: float | Tuple[float, float] | Dict[str, Dict[str, float]] | Dict[str, Dict[str, Tuple[float, float]]], 
+               flip_rate: Dict[str, Dict[str, Tuple[float, float]]], 
                copy_data: bool = True,
                confidence_model: LogisticRegression = LogisticRegression(max_iter = const.MAX_ITER, n_jobs = const.N_JOBS), 
                confidence_threshold: float = 1.0) -> pd.DataFrame:
@@ -48,49 +48,29 @@ def label_bias(data: pd.DataFrame,
     ValueError
         If the rate is not between 0 and 1 inclusive, the threshold is not between 0 and 1 inclusive, the label column name is not a column in the dataset, or the label column is not a column of integers with values 0 and 1.
     """
-    if type(rate) == float and not 0 <= cast(float, rate) <= 1:
-        raise ValueError('Rate must be between 0 and 1, inclusive.')
+    for attribute_values in flip_rate.values():
+        for attribute_rates in attribute_values.values():
+            if not (0 <= attribute_rates[0] <= 1 and 0 <= attribute_rates[1] <= 1):
+                raise ValueError('All rates must be between 0 and 1, inclusive.')
+            if confidence_threshold < attribute_rates[0] or confidence_threshold < attribute_rates[1]:
+                raise ValueError('Confidence threshold must be greater than or equal to all rates provided.')
     if not -1 <= confidence_threshold <= 1:
-        raise ValueError('Threshold must be between -1 and 1, inclusive.')
+        raise ValueError('Confidene threshold must be between -1 and 1, inclusive.')
     if not label_column_name in data.columns:
         raise ValueError('Label column must be one of the columns in the provided dataset.')
     if not (is_numeric_dtype(data[label_column_name]) and data[label_column_name].isin([0,1]).all()):
         raise ValueError('Label column must be a column of integers with values 0 and 1.')
     
     new_data: pd.DataFrame = data.copy() if copy_data else data
-    flippable_indexes = __get_flippable_indexes(data, confidence_model, confidence_threshold)
-    
-    # flat rate, one value
-    if type(rate) == float:
-        rate = cast(float, rate)
-        __flip_labels(data, label_column_name, rate, flippable_indexes)
-    
-    # pos -> neg and neg -> pos values specified
-    elif type(rate) == Tuple[float, float]:
-        rate = cast(Tuple[float, float], rate)
-        __flip_labels(data, label_column_name, rate[0], [i for i in flippable_indexes if data.at[i, label_column_name] == 1])
-        __flip_labels(data, label_column_name, rate[1], [i for i in flippable_indexes if data.at[i, label_column_name] == 0])
-    
-    # rates for each value of each sensitive attribute are specified
-    elif type(rate) == Dict[str, Dict[str, float]]:
-        rate = cast(Dict[str, Dict[str, float]], rate)
-        for attribute_column_name, attribute_values in rate.items():
-            for attribute_value, attribute_rate in attribute_values.items():
-                __flip_labels(data, label_column_name, attribute_rate, [i for i in flippable_indexes if data.at[i, attribute_column_name] == attribute_value])
-    
-    # rates for each value of each sensitive attribute, separated by pos -> neg and neg -> pos, are specified
-    else:
-        rate = cast(Dict[str, Dict[str, Tuple[float, float]]], rate)
-        for attribute_column_name, attribute_values in rate.items():
-            for attribute_value, attribute_rates in attribute_values.items():
-                __flip_labels(data, label_column_name, attribute_rates[0], [i for i in flippable_indexes if data.at[i, label_column_name] == 1])
-                __flip_labels(data, label_column_name, attribute_rates[1], [i for i in flippable_indexes if data.at[i, label_column_name] == 0])
-                
+    flippable_indexes, test_rate = __get_flippable_indexes(data, flip_rate, label_column_name)
+    flippable_indexes = __restrict_flippable_indexes(data, flippable_indexes, confidence_model, confidence_threshold)
+    __flip_labels(data, flippable_indexes, test_rate, label_column_name)
+                    
     return new_data
 
 def __get_flippable_indexes(data: pd.DataFrame,
-                            confidence_model: LogisticRegression, 
-                            confidence_threshold: float) -> List[int]:
+                            flip_rate: Dict[str, Dict[str, Tuple[float, float]]],
+                            label_column_name: str) -> Tuple[List[int], float]:
     """Returns a list of all of the indexes of labels that are available to flip.
     
     Parameters
@@ -108,40 +88,41 @@ def __get_flippable_indexes(data: pd.DataFrame,
         The indexes of all of the labels that are available to flip
     """
     flippable_indexes: List[int] = []
+    test_rate: float = 0
+    for sensitive_attribute_column, sensitive_attribute_values in flip_rate.items():
+        for sensitive_attribute_value, value_rates in sensitive_attribute_values.items():
+            for i in range(len(value_rates)):
+                if value_rates[i] > 0:
+                    if test_rate != 0 and value_rates[i] != test_rate:
+                        raise ValueError('Mutliple rates found in data')
+                    flippable_indexes.extend(data.loc[(data[sensitive_attribute_column] == sensitive_attribute_value) & (data[label_column_name] == 1 - i)].index)
+                    test_rate = value_rates[i]
     
+    return flippable_indexes, test_rate
+
+def __restrict_flippable_indexes(data: pd.DataFrame,
+                                    flippable_indexes: List[int],
+                                    confidence_model: LogisticRegression, 
+                                    confidence_threshold: float) -> List[int]:
     if abs(confidence_threshold) < 1 and hasattr(confidence_model, "classes_"):
         confidences = []
         for confidence in confidence_model.predict_proba(data):
             confidences.append(max(confidence))
         confidences = np.array(confidences)
+        confidences = confidences[flippable_indexes]
+        
         confidence_proportion: int = int(abs(confidence_threshold) * len(confidences))
         if confidence_threshold > 0:
             flippable_indexes = confidences.argpartition(confidence_proportion - 1)[:confidence_proportion].tolist()
         else:
             flippable_indexes = confidences.argpartition(-confidence_proportion)[-confidence_proportion:].tolist()
-    else:
-        flippable_indexes = [*range(len(data.index))]
-    
     return flippable_indexes
 
 def __flip_labels(data: pd.DataFrame,
-                  label_column_name: str,
-                  rate: float,
-                  flippable_indexes: List[int]):
-    """Flips a portion of the labels in the data provided. 
-    
-    Parameters
-    ----------
-    data: pandas.DataFrame
-        DataFrame into which bias is to be introduced.
-    label_column_name: str
-        Name of the column that contains the labels to be flipped.
-    rate: float
-        Rate at which the labels are to be flipped.
-    flippable_indexes: List[int]
-        List of all of the indexes of labels that are available to flip.
-    """
-    for _ in range(int(len(flippable_indexes) * rate)):
-            flip_index: int = random.choice(flippable_indexes)
-            data.at[flip_index, label_column_name] = 1 - data.at[flip_index, label_column_name]
-            flippable_indexes.remove(flip_index)
+                  flippable_indexes: List[int],
+                  flip_rate: float,
+                  label_column_name: str):
+    for _ in range(int(len(flippable_indexes) * flip_rate)):
+        flip_index: int = random.choice(flippable_indexes)
+        data.at[flip_index, label_column_name] = 1 - data.at[flip_index, label_column_name]
+        flippable_indexes.remove(flip_index)

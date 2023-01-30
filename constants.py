@@ -2,21 +2,16 @@ import os
 import numpy as np
 
 # ML Models
-MAX_ITER = 10000
-N_JOBS = -1
-DIFFERENCE_BOUND = 0.01
+MAX_ITER: int = 10000
+N_JOBS: int = -1
+DIFFERENCE_BOUND: float = 0.01
 
 # Analyzer
-TRIAL_COUNT_DEFAULT = 10
-TRIAL_MAX_ATTEMPTS = 5
-RESULT_COLUMNS = ['Flip Rate',
-                  'Confidence Threshold', 
-                  'Unconstrained Accuracy', 
-                  'Unconstrained DP Ratio', 
-                  'DP Constrained Accuracy', 
-                  'DP Constrained DP Ratio']
-LABEL_BIAS_RANGE_MIN = 0
-LABEL_BIAS_RANGE_MAX = 0.5
+TRIAL_COUNT_DEFAULT: int = 10
+TRIAL_MAX_ATTEMPTS: int = 5
+LABEL_BIAS_RANGE_MIN: float = 0
+LABEL_BIAS_RANGE_MAX: float = 0.5
+
 
 # Data Reader
 ADULT_PARAMS = (
@@ -42,28 +37,6 @@ ADULT_PARAMS = (
     1,
     'Target',
     ['Race', 'Sex'])
-POKEMON_PARAMS = (
-    {
-        'Number': np.int64,
-        'Name': 'string',
-        'Type1': 'string',
-        'Type2': 'string',
-        'Total': np.int64,
-        'HP': np.int64,
-        'Attack': np.int64,
-        'Defense': np.int64,
-        'Sp. Atk': np.int64,
-        'Sp. Def': np.int64,
-        'Speed': np.int64,
-        'Generation': np.int64,
-        'Legendary': 'string'
-    },
-    './Data/Pokemon/pokemon.data',
-    0,
-    './Data/Pokemon/pokemon.test',
-    1,
-    'Legendary',
-    ['Total', 'Generation'])
 DEBUG_PARAMS = (
     {
         'A': np.int64,
@@ -78,11 +51,20 @@ DEBUG_PARAMS = (
     ['B']
 )
 
-# File Handler
-DATA_DIR = './Data'
-RESULTS_DIR = './Results'
-RESULTS_FILE_NAME = 'results.csv'
-RESULTS_FILE_LOC = os.path.join(RESULTS_DIR, RESULTS_FILE_NAME)
+# File Handler / Plotter
+DATA_DIR: str = './Data'
 
-# Plotter
-LINES = {'Unconstrained': 'red', 'DP Constrained': 'blue'}
+RESULTS_DIR: str = './Results'
+RESULTS_FILE_NAME: str = 'results.csv'
+RESULTS_FILE_LOC: str = os.path.join(RESULTS_DIR, RESULTS_FILE_NAME)
+
+COL_TRIAL: str = 'Trial'
+COL_FLIPRATE: str = 'Flip Rate'
+COL_POSITIVE: str = 'Positive'
+COL_NEGATIVE: str = 'Negative'
+COL_CONFIDENCE_THRESHOLD: str = 'Confidence Threshold'
+COL_ACCURACY: str = 'Accuracy'
+COL_DP_DIFFERENCE: str = 'DP Difference'
+
+MODELS = {'Unconstrained': 'red', 'DP Constrained': 'blue'}
+METRICS = [COL_ACCURACY, COL_DP_DIFFERENCE]
