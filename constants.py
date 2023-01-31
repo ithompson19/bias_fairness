@@ -7,9 +7,10 @@ N_JOBS: int = -1
 DIFFERENCE_BOUND: float = 0.01
 
 # Analyzer
-TRIAL_COUNT_DEFAULT: int = 10
+TRIAL_COUNT_DEFAULT: int = 1
 TRIAL_MAX_ATTEMPTS: int = 5
-LABEL_BIAS_RANGE_MIN: float = 0
+LABEL_BIAS_RANGE_INTERVAL: float = 0.1
+LABEL_BIAS_RANGE_MIN: float = 0.0
 LABEL_BIAS_RANGE_MAX: float = 0.5
 
 
@@ -34,6 +35,29 @@ ADULT_PARAMS = (
     './Data/Adult/adult.data',
     0,
     './Data/Adult/adult.test',
+    1,
+    'Target',
+    ['Race', 'Sex'])
+SMALLADULT_PARAMS = (
+    {
+        'Age': np.int64, 
+        'Workclass': 'string',
+        'fnlwgt': np.int64,
+        'Education': 'string',
+        'Education-Num': np.int64,
+        'Marital Status': 'string',
+        'Occupation': 'string',
+        'Relationship': 'string',
+        'Race': 'string',
+        'Sex': 'string',
+        'Capital Gain': np.int64,
+        'Capital Loss': np.int64,
+        'Hours per week': np.int64,
+        'Country': 'string',
+        'Target': 'string' },
+    './Data/SmallAdult/adult.data',
+    0,
+    './Data/SmallAdult/adult.test',
     1,
     'Target',
     ['Race', 'Sex'])

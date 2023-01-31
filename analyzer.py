@@ -15,10 +15,11 @@ from sklearn.metrics import accuracy_score
 from data_reader import DataReader
 
 
-def analyze_label_bias(dataReader: DataReader, 
-                       range_interval: float, 
+def analyze_label_bias(dataReader: DataReader,
+                       range_interval: float = const.LABEL_BIAS_RANGE_INTERVAL, 
                        range_min: float | Tuple[float, float] | Dict[str, Dict[str, float]] | Dict[str, Dict[str, Tuple[float, float]]] = const.LABEL_BIAS_RANGE_MIN,
                        range_max: float | Tuple[float, float] | Dict[str, Dict[str, float]] | Dict[str, Dict[str, Tuple[float, float]]] = const.LABEL_BIAS_RANGE_MAX,
+                       confidence_interval_test_flip_rate: float | Tuple[float, float] | Dict[str, Dict[str, float]] | Dict[str, Dict[str, Tuple[float, float]]] = None,
                        trial_count: int = const.TRIAL_COUNT_DEFAULT,
                        cpu_count: int = mp.cpu_count()):
     results: pd.DataFrame = pd.concat((__label_bias_trial(dataReader=dataReader, 
@@ -26,7 +27,7 @@ def analyze_label_bias(dataReader: DataReader,
                                                           range_min=range_min,
                                                           range_max=range_max, 
                                                           cpu_count=cpu_count, 
-                                                          confidence_interval_test_flip_rate=None,
+                                                          confidence_interval_test_flip_rate=confidence_interval_test_flip_rate,
                                                           trial_num=trial_num) 
                                        for trial_num in range(1, trial_count + 1)), ignore_index=True)
 
@@ -65,7 +66,7 @@ def __label_bias_trial(dataReader: DataReader,
     dataframes, failures = zip(*ret)
     dataframes = filter(lambda df: not df.empty, dataframes)
     trial_result: pd.DataFrame = pd.concat(dataframes, ignore_index=True)
-    print(f'| Failures: {sum(failures)}', flush=True)
+    print(f'] Failures: {sum(failures)}', flush=True)
     return trial_result
 
 def __label_bias_variable_args_from_range_flip_rate(range_interval: float, 
@@ -79,7 +80,7 @@ def __label_bias_variable_args_from_range_flip_rate(range_interval: float,
         range_max = cast(float, range_max)
         return [(flip_rate, 1, 0) for flip_rate in np.arange(range_min, range_max + range_interval, range_interval).tolist()]
     
-    elif type(range_min) == Tuple[float, float]:
+    elif type(range_min) == tuple:
         range_min = cast(Tuple[float, float], range_min)
         range_max = cast(Tuple[float, float], range_max)
         if not any(range_min[i] == range_max[i] == 0 for i in [0, 1]):
@@ -88,33 +89,25 @@ def __label_bias_variable_args_from_range_flip_rate(range_interval: float,
             return [((flip_rate, 0), 1, 0) for flip_rate in np.arange(range_min[0], range_max[0] + range_interval, range_interval).tolist()]
         else:
             return [((0, flip_rate), 1, 0) for flip_rate in np.arange(range_min[1], range_max[1] + range_interval, range_interval).tolist()]
+    
+    elif type(range_min) == dict:
         
-    elif type(range_min) == Dict[str, Dict[str, float]]:
-        range_min = cast(Dict[str, Dict[str, float]], range_min)
-        range_max = cast(Dict[str, Dict[str, float]], range_max)
         for attribute_name, attribute_values in range_max.items():
             for attribute_value, rate in attribute_values.items():
                 if attribute_name not in range_min or attribute_value not in range_min[attribute_name]:
                     raise ValueError('Attribute names and values must be shared between range min and max.')
-                return [({attribute_name: {attribute_value: flip_rate}}, 1, 0) for flip_rate in np.arange(range_min[attribute_name][attribute_value], range_max[attribute_name][attribute_value] + range_interval, range_interval).tolist()]
-                    
-    elif type(range_min) == Dict[str, Dict[str, Tuple[float, float]]]:
-        range_min = cast(Dict[str, Dict[str, Tuple[float, float]]], range_min)
-        range_max = cast(Dict[str, Dict[str, Tuple[float, float]]], range_max)
-        for attribute_name, attribute_values in range_max.items():
-            for attribute_value, rate in attribute_values.items():
-                if attribute_name not in range_min or attribute_value not in range_min[attribute_name]:
-                    raise ValueError('Attribute names and values must be shared between range min and max.')
-                if rate[0] > 0:
-                    return [({attribute_name: {attribute_value: (flip_rate, 0)}}, 1, 0) for flip_rate in np.arange(range_min[attribute_name][attribute_value][0], range_max[attribute_name][attribute_value][0] + range_interval, range_interval).tolist()]
+                if type(rate) == float:
+                    return [({name: {value: flip_rate}}, 1, 0) for name in range_max.keys() for value in range_max[name].keys() for flip_rate in np.arange(range_min[attribute_name][attribute_value], range_max[attribute_name][attribute_value] + range_interval, range_interval).tolist()]
+                elif rate[0] > 0:
+                    return [({name: {value: (flip_rate, 0)}}, 1, 0) for name in range_max.keys() for value in range_max[name].keys() for flip_rate in np.arange(range_min[attribute_name][attribute_value][0], range_max[attribute_name][attribute_value][0] + range_interval, range_interval).tolist()]
                 else:
-                    return [({attribute_name: {attribute_value: (0, flip_rate)}}, 1, 0) for flip_rate in np.arange(range_min[attribute_name][attribute_value][1], range_max[attribute_name][attribute_value][1] + range_interval, range_interval).tolist()]
+                    return [({name: {value: (0, flip_rate)}}, 1, 0) for name in range_max.keys() for value in range_max[name].keys() for flip_rate in np.arange(range_min[attribute_name][attribute_value][1], range_max[attribute_name][attribute_value][1] + range_interval, range_interval).tolist()]
 
 def __label_bias_variable_args_from_range_confidence_interval(flip_rate: float | Tuple[float, float] | Dict[str, Dict[str, float]] | Dict[str, Dict[str, Tuple[float, float]]], 
                                                               range_interval: float, 
                                                               range_min: float, 
                                                               range_max: float) -> List[float]:
-    [(flip_rate, confidence_interval) for confidence_interval in np.arange(range_min, range_max + range_interval, range_interval).tolist()]
+    return [(flip_rate, confidence_interval) for confidence_interval in np.arange(range_min, range_max + range_interval, range_interval).tolist()]
 
 def __label_bias_fetch_train_constrain(flip_rate: float | Tuple[float, float] | Dict[str, Dict[str, float]] | Dict[str, Dict[str, Tuple[float, float]]], 
                                        confidence_threshold: float, 

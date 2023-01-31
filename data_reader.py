@@ -13,6 +13,7 @@ Debug
     Simple dataset meant for debugging.
 """
 
+from math import isclose
 from pathlib import Path
 from typing import Any, Dict, List, Tuple, cast
 
@@ -135,7 +136,7 @@ class DataReader:
         ValueError
             If the rate is not between 0 and 1 inclusive, or the threshold is not between -1 and 1 inclusive.
         """
-        if not -1 <= confidence_threshold <= 1:
+        if not -1 <= confidence_threshold <= 1 and not isclose(confidence_threshold, -1) and not isclose(confidence_threshold, 1):
             raise ValueError('Threshold must be between -1 and 1, inclusive.')
         
         data, labels, _ = self.__read_file(is_test = False)
@@ -143,14 +144,19 @@ class DataReader:
         if confidence_threshold < 1 and not hasattr(initial_model, "classes_"):
             initial_model.fit(X = data, y = labels)
         full_rate: Dict[str, Dict[str, Tuple[float, float]]] = self.fill_incomplete_rate_object(flip_rate, confidence_threshold)
+        for attribute_values in full_rate.values():
+            for attribute_rates in attribute_values.values():
+                if not (0 <= attribute_rates[0] <= 1 and 0 <= attribute_rates[1] <= 1):
+                    raise ValueError('All rates must be between 0 and 1, inclusive.')
+                if confidence_threshold < attribute_rates[0] or confidence_threshold < attribute_rates[1]:
+                    raise ValueError('Confidence threshold must be greater than or equal to all rates provided.')
         
-        data = bias_inducer.label_bias(data=data,
-                                       label_column_name=self.label_column_name,
-                                       flip_rate=full_rate,
-                                       copy_data=False,
-                                       confidence_model=initial_model,
-                                       confidence_threshold=confidence_threshold)
+        data[self.label_column_name] = self.__encoder.fit_transform(y = data[self.label_column_name])
+        flippable_indexes, test_rate = bias_inducer.get_flippable_indexes(data, full_rate, self.label_column_name)
         data = self.__encode_dataframe(data)
+        flippable_indexes = bias_inducer.restrict_flippable_indexes(data, flippable_indexes, initial_model, confidence_threshold)
+        bias_inducer.flip_labels(data, flippable_indexes, test_rate, self.label_column_name)
+        
         labels = data[self.label_column_name]
         
         return data, labels
@@ -192,9 +198,9 @@ class DataReader:
         full_rate: Dict[str, Dict[str, Tuple[float, float]]] = {}
         if type(flip_rate) == float:
             flip_rate = cast(float, flip_rate)
-            if not 0 <= flip_rate <= 1:
+            if not 0 <= flip_rate <= 1 and not isclose(flip_rate, 0) and not isclose(flip_rate, 1):
                 raise ValueError('Flip rate must be between 0 and 1, inclusive.')
-            if confidence_threshold < flip_rate:
+            if confidence_threshold < flip_rate and not isclose(confidence_threshold, flip_rate):
                 raise ValueError('Confidence threshold must be greater than or equal to flip rate.')
             for attribute_name in self.sensitive_attribute_column_names:
                 if attribute_name not in full_rate:
@@ -202,45 +208,37 @@ class DataReader:
                 for attribute_value in self.__get_sensitive_attribute_vals(attribute_name):
                     full_rate[attribute_name][attribute_value] = (flip_rate, flip_rate)
                     
-        elif type(flip_rate) == Tuple[float, float]:
+        elif type(flip_rate) == tuple:
             flip_rate = cast(Tuple[float, float], flip_rate)
-            if not all(0 <= rate <= 1 for rate in flip_rate):
+            if not all(0 <= rate <= 1 or isclose(rate, 0) or isclose(rate, 1) for rate in flip_rate):
                 raise ValueError('Flip rate must be between 0 and 1, inclusive.')
-            if any(confidence_threshold < rate for rate in flip_rate):
+            if any(confidence_threshold < rate and not isclose(confidence_threshold, rate) for rate in flip_rate):
                 raise ValueError('Confidence threshold must be greater than or equal to flip rate.')
             for attribute_name in self.sensitive_attribute_column_names:
                 if attribute_name not in full_rate:
                     full_rate[attribute_name] = {}
                 for attribute_value in self.__get_sensitive_attribute_vals(attribute_name):
                     full_rate[attribute_name][attribute_value] = flip_rate
-                    
-        elif type(flip_rate) == Dict[str, Dict[str, float]]:
-            flip_rate = cast(Dict[str, Dict[str, float]], flip_rate)
+                          
+        elif type(flip_rate) == dict:
             for attribute_name in self.sensitive_attribute_column_names:
                 if attribute_name not in full_rate:
                     full_rate[attribute_name] = {}
                 for attribute_value in self.__get_sensitive_attribute_vals(attribute_name):
                     if attribute_name in flip_rate and attribute_value in flip_rate[attribute_name]:
-                        if not 0 <= flip_rate[attribute_name][attribute_value] <= 1:
-                            raise ValueError('Rate must be between 0 and 1, inclusive.')
-                        if confidence_threshold < flip_rate[attribute_name][attribute_value]:
-                            raise ValueError('Confidence threshold must be greater than or equal to flip rate.')
-                        full_rate[attribute_name][attribute_value] = (flip_rate[attribute_name][attribute_value], flip_rate[attribute_name][attribute_value])
-                    else:
-                        full_rate[attribute_name][attribute_value]=  (0, 0)
-                        
-        elif type(flip_rate) == Dict[str, Dict[str, Tuple[float, float]]]:
-            flip_rate = cast(Dict[str, Dict[str, Tuple[float, float]]], flip_rate)
-            for attribute_name in self.sensitive_attribute_column_names:
-                if attribute_name not in full_rate:
-                    full_rate[attribute_name] = {}
-                for attribute_value in self.__get_sensitive_attribute_vals(attribute_name):
-                    if attribute_name in flip_rate and attribute_value in flip_rate[attribute_name]:
-                        if not all(0 <= rate <= 1 for rate in flip_rate[attribute_name][attribute_value]):
-                            raise ValueError('Rate must be between 0 and 1, inclusive.')
-                        if any(confidence_threshold < rate for rate in flip_rate[attribute_name][attribute_value]):
-                            raise ValueError('Confidence threshold must be greater than or equal to flip rate.')
-                        full_rate[attribute_name][attribute_value] = flip_rate[attribute_name][attribute_value]
+                        if type(flip_rate[attribute_name][attribute_value]) == float:
+                            rate = flip_rate[attribute_name][attribute_value]
+                            if not 0 <= rate <= 1 and not isclose(rate, 0) and not isclose(rate, 1):
+                                raise ValueError('Flip rate must be between 0 and 1, inclusive.')
+                            if confidence_threshold < rate and not isclose(confidence_threshold, rate):
+                                raise ValueError('Confidence threshold must be greater than or equal to flip rate.')
+                            full_rate[attribute_name][attribute_value] = (rate, rate)
+                        else:
+                            if not all(0 <= rate <= 1 or isclose(rate, 0) or isclose(rate, 1) for rate in flip_rate[attribute_name][attribute_value]):
+                                raise ValueError('Rate must be between 0 and 1, inclusive.')
+                            if any(confidence_threshold < rate and not isclose(confidence_threshold, rate) for rate in flip_rate[attribute_name][attribute_value]):
+                                raise ValueError('Confidence threshold must be greater than or equal to flip rate.')
+                            full_rate[attribute_name][attribute_value] = flip_rate[attribute_name][attribute_value]
                     else:
                         full_rate[attribute_name][attribute_value]=  (0, 0)
                         
@@ -334,4 +332,5 @@ class DataReader:
         return self.__sens_attr_values[attribute_name]
         
 Adult = DataReader(*const.ADULT_PARAMS)
+SmallAdult = DataReader(*const.SMALLADULT_PARAMS)
 Debug = DataReader(*const.DEBUG_PARAMS)
