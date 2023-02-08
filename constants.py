@@ -1,4 +1,5 @@
-import os
+"""Holds all constants.
+"""
 import numpy as np
 
 # ML Models
@@ -7,7 +8,7 @@ N_JOBS: int = -1
 DIFFERENCE_BOUND: float = 0.01
 
 # Analyzer
-TRIAL_COUNT_DEFAULT: int = 1
+TRIAL_COUNT_DEFAULT: int = 3
 TRIAL_MAX_ATTEMPTS: int = 5
 LABEL_BIAS_RANGE_INTERVAL: float = 0.1
 LABEL_BIAS_RANGE_MIN: float = 0.0
@@ -79,14 +80,14 @@ DEBUG_PARAMS = (
 DATA_DIR: str = './Data'
 
 RESULTS_DIR: str = './Results'
-RESULTS_FILE_NAME: str = 'results.csv'
-RESULTS_FILE_LOC: str = os.path.join(RESULTS_DIR, RESULTS_FILE_NAME)
+FLIP_RATE_FILE_NAME: str = 'flip_rate.csv'
 
 COL_TRIAL: str = 'Trial'
 COL_FLIPRATE: str = 'Flip Rate'
 COL_POSITIVE: str = 'Positive'
 COL_NEGATIVE: str = 'Negative'
 COL_CONFIDENCE_THRESHOLD: str = 'Confidence Threshold'
+COL_UNIFORM: str = 'Uniform'
 COL_ACCURACY: str = 'Accuracy'
 COL_DP_DIFFERENCE: str = 'DP Difference'
 

@@ -1,55 +1,117 @@
-from typing import Dict, List, Tuple
-import constants as const
-import pandas as pd
+from typing import List, Tuple
 import os
+import pandas as pd
+import constants as const
+from data_reader import DataReader
 
-def generate_result_row(trial_num: int, flip_rate: Dict[str, Dict[str, Tuple[float, float]]], confidence_threshold: float, model_metrics: List[float]) -> pd.DataFrame:
+def generate_result_row(data_reader: DataReader, trial_num: int, flip_rate: Tuple[str, str, float, float], confidence_threshold: float, model_metrics: List[float]) -> pd.DataFrame:
     if len(model_metrics) != len(const.MODELS) * len(const.METRICS):
         raise ValueError('model_metrics array must include every combination of model and metric.')
-    df: pd.DataFrame = pd.DataFrame(columns=__generate_column_names(flip_rate))
+    df: pd.DataFrame = pd.DataFrame(columns=__generate_column_names(data_reader))
     values = [trial_num]
-    for sensitive_attribute_name, sensitive_attribute_values in flip_rate.items():
-        for sensitive_attribute_value in sensitive_attribute_values:
-            values.append(flip_rate[sensitive_attribute_name][sensitive_attribute_value][0])
-            values.append(flip_rate[sensitive_attribute_name][sensitive_attribute_value][1])
+    for column_name in data_reader.sensitive_attribute_column_names:
+        for value in data_reader.get_sensitive_attribute_vals(column_name):
+            if flip_rate[0]:
+                if flip_rate[1].startswith('-'):
+                    values.append(flip_rate[2] if flip_rate[0] == column_name and flip_rate[1].lstrip('-') != value else 0.0)
+                    values.append(flip_rate[3] if flip_rate[0] == column_name and flip_rate[1].lstrip('-') != value else 0.0)
+                else:
+                    values.append(flip_rate[2] if flip_rate[0] == column_name and flip_rate[1] == value else 0.0)
+                    values.append(flip_rate[3] if flip_rate[0] == column_name and flip_rate[1] == value else 0.0)
+            else:
+                values.append(flip_rate[2])
+                values.append(flip_rate[3])
     values.append(confidence_threshold)
     values.extend(model_metrics)
     df.loc[0] = values
     return df
-    
-def save_results_to_file(data: pd.DataFrame):
+
+def save_results(data: pd.DataFrame, range_min: Tuple[str, str, float, float], range_max: Tuple[str, str, float, float], confidence_interval_test_flip_rate: Tuple[str, str, float, float]):
+    file_name: str = f'{__generate_file_prefix(range_min, range_max, confidence_interval_test_flip_rate)}{const.FLIP_RATE_FILE_NAME}'
     try:
         os.makedirs(const.RESULTS_DIR)
-    except:
+    except FileExistsError:
         pass
-    if os.path.isfile(const.RESULTS_FILE_LOC):
+    file_path = os.path.join(const.RESULTS_DIR, file_name)
+    if os.path.exists(file_path):
         __move_results_to_new_subdirectory()
-    
-    print(f'Writing results to {const.RESULTS_FILE_LOC}')
-    data.to_csv(const.RESULTS_FILE_LOC, index=False)
-    
-def read_from_subdirectory(subdirectory: str = '') -> pd.DataFrame:
-    path: str = os.path.join(const.RESULTS_DIR, subdirectory, const.RESULTS_FILE_NAME) if subdirectory else const.RESULTS_FILE_LOC
-    try:
-        return pd.read_csv(path)
-    except:
-        raise IOError(f'{path} cannot be read.')
-    
-def full_path_from_subdirectory(subdirectory: str, file_name: str) -> str:
-    path: str = os.path.join(const.RESULTS_DIR, subdirectory, file_name) if subdirectory else os.path.join(const.RESULTS_DIR, file_name)
-    return path
+    print(f'Writing results to {file_path}')
+    data.to_csv(file_path, index=False)
 
-def __generate_column_names(flip_rate: Dict[str, Dict[str, Tuple[float, float]]]) -> List[str]:
+def read_all_results() -> List[Tuple[pd.DataFrame, str]]:
+    try:
+        os.makedirs(const.RESULTS_DIR)
+    except FileExistsError:
+        pass
+    results_list: List[pd.DataFrame] = []
+    for f in os.listdir(const.RESULTS_DIR):
+        if f.endswith(const.FLIP_RATE_FILE_NAME):
+            results_list.append((pd.read_csv(os.path.join(const.RESULTS_DIR, f)), f))
+    return results_list
+
+def generate_x_axis_name(results_file_name: str) -> str:
+    keywords: List[str] = results_file_name.split('_')
+    keywords[-1] = keywords[-1][:-len('.csv')]
+    for i, keyword in enumerate(keywords):
+        if keyword == const.COL_CONFIDENCE_THRESHOLD.replace(' ', '-').lower():
+            keywords[i] = const.COL_CONFIDENCE_THRESHOLD
+        elif '-' in keyword:
+            keywords[i] = '-'.join([subword.capitalize() for subword in keyword.split('-')])
+        else:
+            keywords[i] = keyword.capitalize()
+    if keywords[0] == const.COL_CONFIDENCE_THRESHOLD:
+        return f'{keywords[0]} ({" ".join(keywords[1:])})'
+    return ' '.join(keywords)
+
+def generate_x_column(data: pd.DataFrame) -> str:
+    if len(data[const.COL_CONFIDENCE_THRESHOLD].unique()) > 1:
+        return const.COL_CONFIDENCE_THRESHOLD
+    for column in data.columns:
+        if column.endswith(const.COL_FLIPRATE) and len(data[column].unique()) > 1:
+            return column
+    raise ValueError('No columns have changed value in the data. Unable to plot.')
+
+def generate_plot_file_name(results_file_name: str, metric_name: str) -> str:
+    return os.path.join(const.RESULTS_DIR, f'{results_file_name[:-len(".csv")]}_{metric_name.lower()}.png')
+
+def __generate_column_names(data_reader: DataReader) -> List[str]:
     columns: List[str] = [const.COL_TRIAL]
-    for sensitive_attribute_values in flip_rate.values():
-        for sensitive_attribute_value in sensitive_attribute_values:
-            columns.append(f'{sensitive_attribute_value} {const.COL_POSITIVE} {const.COL_FLIPRATE}')
-            columns.append(f'{sensitive_attribute_value} {const.COL_NEGATIVE} {const.COL_FLIPRATE}')
+    for column_name in data_reader.sensitive_attribute_column_names:
+        for value in data_reader.get_sensitive_attribute_vals(column_name):
+            columns.append(f'{value} {const.COL_POSITIVE} {const.COL_FLIPRATE}')
+            columns.append(f'{value} {const.COL_NEGATIVE} {const.COL_FLIPRATE}')
     columns.append(const.COL_CONFIDENCE_THRESHOLD)
-    for model in const.MODELS.keys():
+    for model in const.MODELS:
         for test in const.METRICS:
             columns.append(f'{model} {test}')
     return columns
+
+def __generate_file_prefix(range_min: float | Tuple[str, str, float, float],
+                           range_max: float | Tuple[str, str, float, float],
+                           confidence_interval_test_flip_rate: Tuple[str, str, float, float]) -> str:
+    prefix: str = ''
+    if isinstance(range_min, float):
+        prefix = const.COL_CONFIDENCE_THRESHOLD.replace(' ', '-')
+        if confidence_interval_test_flip_rate[0]:
+            prefix = f'{prefix}_{"Non" if confidence_interval_test_flip_rate[1].startswith("-") else ""}{confidence_interval_test_flip_rate[1]}'
+        if confidence_interval_test_flip_rate[3] == 0:
+            prefix = f'{prefix}_{const.COL_POSITIVE}'
+        elif confidence_interval_test_flip_rate[2] == 0:
+            prefix = f'{prefix}_{const.COL_NEGATIVE}'
+        if prefix == const.COL_CONFIDENCE_THRESHOLD.replace(' ', '-'):
+            prefix = f'{prefix}_{const.COL_UNIFORM}'
+    else:
+        if range_min[0]:
+            prefix = f'{"Non" if range_min[1].startswith("-") else ""}{range_min[1]}'
+        if range_min[2] < range_max[2] and range_min[3] == range_max[3]:
+            prefix = f'{prefix}{"_" if prefix else ""}{const.COL_POSITIVE}'
+        elif range_min[3] < range_max[3] and range_min[2] == range_max[2]:
+            prefix = f'{prefix}{"_" if prefix else ""}{const.COL_NEGATIVE}'
+        if not prefix:
+            prefix = const.COL_UNIFORM
+    prefix = prefix + '_'
+    prefix = prefix.lower()
+    return prefix
 
 def __move_results_to_new_subdirectory():
     min_unused_folder = 1
@@ -58,7 +120,7 @@ def __move_results_to_new_subdirectory():
         try:
             os.makedirs(new_path)
             break
-        except:
+        except FileExistsError:
             min_unused_folder += 1
     print(f'Moving existing results to {new_path}')
     for f in os.listdir(const.RESULTS_DIR):

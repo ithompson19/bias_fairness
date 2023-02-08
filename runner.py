@@ -1,178 +1,50 @@
 import warnings
 
 import analyzer
+from data_reader import DataReader, SmallAdult
 import plotter
-from data_reader import Adult, DataReader, Debug, SmallAdult
 
 def main():
-    # TODO: once all changes are working, use a linter to pretty everything up
-    # TODO: create CLI for program once everything is working
-    dr: DataReader = SmallAdult
-    min: float = 0.0
-    max: float = 0.5
-    conf_min: float = 0.2
-    conf_max: float = 1.0
-    flip_rate: float = 0.2
-    flip_rate_blind(dr, min, max)
-    flip_rate_blind_confidence_interval(dr, conf_min, conf_max, flip_rate)
-    flip_rate_pos_neg(dr, min, max)
-    flip_rate_pos_neg_confidence_interval(dr, conf_min, conf_max, flip_rate)
-    flip_rate_race(dr, min, max)
-    flip_rate_race_confidence_interval(dr, conf_min, conf_max, flip_rate)
-    flip_rate_race_pos_neg(dr, min, max)
-    flip_rate_race_pos_neg_confidence_interval(dr, conf_min, conf_max, flip_rate)
+    data_reader: DataReader = SmallAdult
     
-    
-def flip_rate_blind(dataReader: DataReader, min: float, max: float):
-    print('\nAnalyzing Blind Flip Rate')
-    analyzer.analyze_label_bias(dataReader=dataReader, 
-                                range_min = min,
-                                range_max = max)
+    # run_flip_rate_tests(data_reader, flip_min=0.0, flip_max=0.5)
+    # run_confidence_interval_tests(data_reader, conf_min=0.2, conf_max=1.0, flip_rate=0.2)
     plotter.plot_all()
+    
+def flip_rate_test(message: str, data_reader: DataReader, flip_min: tuple, flip_max: float, column: str = '', val: str = '', pos_test: bool = True, neg_test: bool = True):
+    print(f'\nAnalyzing Flip Rate{": " if message else ""}{message}')
+    analyzer.analyze_label_bias(data_reader=data_reader,
+                                range_min=(column, val, flip_min if pos_test else 0.0, flip_min if neg_test else 0.0),
+                                range_max=(column, val, flip_max if pos_test else 0.0, flip_max if neg_test else 0.0))
 
-def flip_rate_blind_confidence_interval(dataReader: DataReader, min: float, max: float, flip_rate: float):
-    print('\nAnalyzing Blind Confidence Interval')
-    analyzer.analyze_label_bias(dataReader=dataReader, 
-                                range_min=min,
-                                range_max=max,
+def confidence_interval_test(message: str, data_reader: DataReader, conf_min: tuple, conf_max: float, flip_rate: tuple):
+    print(f'\nAnalyzing Confidence Interval{": " if message else ""}{message}')
+    analyzer.analyze_label_bias(data_reader=data_reader,
+                                range_min=conf_min,
+                                range_max=conf_max,
                                 confidence_interval_test_flip_rate=flip_rate)
-    plotter.plot_all()
-
-def flip_rate_pos_neg(dataReader: DataReader, min: float, max: float):
-    print('\nAnalyzing Positive Flip Rate')
-    analyzer.analyze_label_bias(dataReader=dataReader, 
-                                range_min=(min, 0.0),
-                                range_max=(max, 0.0))
-    plotter.plot_all()
-    print('\nAnalyzing Negative Flip Rate')
-    analyzer.analyze_label_bias(dataReader=dataReader, 
-                                range_min=(0.0, 0.0),
-                                range_max=(0.0, 0.5))
-    plotter.plot_all()
-
-def flip_rate_pos_neg_confidence_interval(dataReader: DataReader, min: float, max: float, flip_rate: float):
-    print('\nAnalyzing Positive Confidence Interval')
-    analyzer.analyze_label_bias(dataReader=dataReader, 
-                                range_min=min,
-                                range_max=max,
-                                confidence_interval_test_flip_rate=(flip_rate, 0.0))
-    plotter.plot_all()
-    print('\nAnalyzing Negative Confidence Interval')
-    analyzer.analyze_label_bias(dataReader=dataReader, 
-                                range_min=min,
-                                range_max=max,
-                                confidence_interval_test_flip_rate=(0.0, flip_rate))
-    plotter.plot_all()
     
-def flip_rate_race(dataReader: DataReader, min: float, max: float):
-    print('\nAnalyzing White Flip Rate')
-    analyzer.analyze_label_bias(dataReader=dataReader, 
-                                range_min={'Race': {'White': min}},
-                                range_max={'Race': {'White': max}})
-    plotter.plot_all()
-    print('\nAnalyzing Non-White Flip Rate')
-    analyzer.analyze_label_bias(dataReader=dataReader,
-                                range_min={'Race': {
-                                    'Black': min, 
-                                    'Asian-Pac-Islander': min, 
-                                    'Amer-Indian-Eskimo': min, 
-                                    'Other': min}},
-                                range_max={'Race': {
-                                    'Black': max, 
-                                    'Asian-Pac-Islander': max, 
-                                    'Amer-Indian-Eskimo': max, 
-                                    'Other': max}})
-    plotter.plot_all()
+def run_flip_rate_tests(data_reader: DataReader, flip_min: float, flip_max: float):
+    flip_rate_test('', data_reader, flip_min, flip_max)
+    flip_rate_test('Positive', data_reader, flip_min, flip_max, neg_test=False)
+    flip_rate_test('Negative', data_reader, flip_min, flip_max, pos_test=False)
+    flip_rate_test('White', data_reader, flip_min, flip_max, column='Race', val='White')
+    flip_rate_test('Non-White', data_reader, flip_min, flip_max, column='Race', val='-White')
+    flip_rate_test('White Positive', data_reader, flip_min, flip_max, column='Race', val='White', neg_test=False)
+    flip_rate_test('White Negative', data_reader, flip_min, flip_max, column='Race', val='White', pos_test=False)
+    flip_rate_test('Non-White Positive', data_reader, flip_min, flip_max, column='Race', val='-White', neg_test=False)
+    flip_rate_test('Non-White Negative', data_reader, flip_min, flip_max, column='Race', val='-White', pos_test=False)
     
-def flip_rate_race_confidence_interval(dataReader: DataReader, min: float, max: float, flip_rate: float):
-    print('\nAnalyzing White Confidence Interval')
-    analyzer.analyze_label_bias(dataReader=dataReader, 
-                                range_min=min,
-                                range_max=max,
-                                confidence_interval_test_flip_rate={'Race': {'White': flip_rate}})
-    plotter.plot_all()
-    print('\nAnalyzing Non-White Confidence Interval')
-    analyzer.analyze_label_bias(dataReader=dataReader, 
-                                range_min=min,
-                                range_max=max,
-                                confidence_interval_test_flip_rate={'Race': {
-                                    'Black': flip_rate, 
-                                    'Asian-Pac-Islander': flip_rate, 
-                                    'Amer-Indian-Eskimo': flip_rate, 
-                                    'Other': flip_rate}})
-    plotter.plot_all()
-    
-def flip_rate_race_pos_neg(dataReader: DataReader, min: float, max: float):
-    print('\nAnalyzing White Positive Flip Rate')
-    analyzer.analyze_label_bias(dataReader=dataReader, 
-                                range_min={'Race': {'White': (min, 0.0)}},
-                                range_max={'Race': {'White': (max, 0.0)}})
-    plotter.plot_all()
-    print('\nAnalyzing White Negative Flip Rate')
-    analyzer.analyze_label_bias(dataReader=dataReader, 
-                                range_min={'Race': {'White': (0.0, min)}},
-                                range_max={'Race': {'White': (0.0, max)}})
-    plotter.plot_all()
-    print('\nAnalyzing Non-White Positive Flip Rate')
-    analyzer.analyze_label_bias(dataReader=dataReader,
-                                range_min={'Race': {
-                                    'Black': (min, 0.0), 
-                                    'Asian-Pac-Islander': (min, 0.0), 
-                                    'Amer-Indian-Eskimo': (min, 0.0), 
-                                    'Other': (min, 0.0)}},
-                                range_max={'Race': {
-                                    'Black': (max, 0.0), 
-                                    'Asian-Pac-Islander': (max, 0.0), 
-                                    'Amer-Indian-Eskimo': (max, 0.0), 
-                                    'Other': (max, 0.0)}})
-    plotter.plot_all()
-    print('\nAnalyzing Non-White Negative Flip Rate')
-    analyzer.analyze_label_bias(dataReader=dataReader,
-                                range_min={'Race': {
-                                    'Black': (0.0, min), 
-                                    'Asian-Pac-Islander': (0.0, min), 
-                                    'Amer-Indian-Eskimo': (0.0, min), 
-                                    'Other': (0.0, min)}},
-                                range_max={'Race': {
-                                    'Black': (0.0, max), 
-                                    'Asian-Pac-Islander': (0.0, max), 
-                                    'Amer-Indian-Eskimo': (0.0, max), 
-                                    'Other': (0.0, max)}})
-    plotter.plot_all()
-    
-def flip_rate_race_pos_neg_confidence_interval(dataReader: DataReader, min: float, max: float, flip_rate: float):
-    print('\nAnalyzing White Positive Confidence Interval')
-    analyzer.analyze_label_bias(dataReader=dataReader, 
-                                range_min=min,
-                                range_max=max,
-                                confidence_interval_test_flip_rate={'Race': {'White': (flip_rate, 0.0)}})
-    plotter.plot_all()
-    print('\nAnalyzing White Negative Confidence Interval')
-    analyzer.analyze_label_bias(dataReader=dataReader, 
-                                range_min=min,
-                                range_max=max,
-                                confidence_interval_test_flip_rate={'Race': {'White': (0.0, flip_rate)}})
-    plotter.plot_all()
-    print('\nAnalyzing Non-White Positive Confidence Interval')
-    analyzer.analyze_label_bias(dataReader=dataReader, 
-                                range_min=min,
-                                range_max=max,
-                                confidence_interval_test_flip_rate={'Race': {
-                                    'Black': (flip_rate, 0.0), 
-                                    'Asian-Pac-Islander': (flip_rate, 0.0), 
-                                    'Amer-Indian-Eskimo': (flip_rate, 0.0), 
-                                    'Other': (flip_rate, 0.0)}})
-    plotter.plot_all()
-    print('\nAnalyzing Non-White Negative Confidence Interval')
-    analyzer.analyze_label_bias(dataReader=dataReader, 
-                                range_min=min,
-                                range_max=max,
-                                confidence_interval_test_flip_rate={'Race': {
-                                    'Black': (0.0, flip_rate), 
-                                    'Asian-Pac-Islander': (0.0, flip_rate), 
-                                    'Amer-Indian-Eskimo': (0.0, flip_rate), 
-                                    'Other': (0.0, flip_rate)}})
-    plotter.plot_all()
+def run_confidence_interval_tests(data_reader: DataReader, conf_min: float, conf_max: float, flip_rate: float):
+    confidence_interval_test('', data_reader, conf_min, conf_max, ('', '', flip_rate, flip_rate))
+    confidence_interval_test('Positive', data_reader, conf_min, conf_max, flip_rate=('', '', flip_rate, 0.0))
+    confidence_interval_test('Negative', data_reader, conf_min, conf_max, flip_rate=('', '', 0.0, flip_rate))
+    confidence_interval_test('White', data_reader, conf_min, conf_max, flip_rate=('Race', 'White', flip_rate, flip_rate))
+    confidence_interval_test('Non-White', data_reader, conf_min, conf_max, flip_rate=('Race', '-White', flip_rate, flip_rate))
+    confidence_interval_test('White Positive', data_reader, conf_min, conf_max, flip_rate=('Race', 'White', flip_rate, 0.0))
+    confidence_interval_test('White Negative', data_reader, conf_min, conf_max, flip_rate=('Race', 'White', 0.0, flip_rate))
+    confidence_interval_test('Non-White Positive', data_reader, conf_min, conf_max, flip_rate=('Race', '-White', flip_rate, 0.0))
+    confidence_interval_test('Non-White Negative', data_reader, conf_min, conf_max, flip_rate=('Race', '-White', 0.0, flip_rate))
 
 warnings.filterwarnings('ignore')
 if __name__ == '__main__':
