@@ -8,11 +8,9 @@ N_JOBS: int = -1
 DIFFERENCE_BOUND: float = 0.01
 
 # Analyzer
-TRIAL_COUNT_DEFAULT: int = 3
+TRIAL_COUNT_DEFAULT: int = 10
 TRIAL_MAX_ATTEMPTS: int = 5
-LABEL_BIAS_RANGE_INTERVAL: float = 0.1
-LABEL_BIAS_RANGE_MIN: float = 0.0
-LABEL_BIAS_RANGE_MAX: float = 0.5
+LABEL_BIAS_RANGE_INTERVAL: float = 0.05
 
 
 # Data Reader
@@ -38,6 +36,7 @@ ADULT_PARAMS = (
     './Data/Adult/adult.test',
     1,
     'Target',
+    ('<=50K', '>50K'),
     ['Race', 'Sex'])
 SMALLADULT_PARAMS = (
     {
@@ -61,6 +60,7 @@ SMALLADULT_PARAMS = (
     './Data/SmallAdult/adult.test',
     1,
     'Target',
+    ('<=50K', '>50K'),
     ['Race', 'Sex'])
 DEBUG_PARAMS = (
     {
@@ -73,6 +73,7 @@ DEBUG_PARAMS = (
     './Data/Debug/debug.test',
     1,
     'C',
+    (0, 1),
     ['B']
 )
 
@@ -89,7 +90,13 @@ COL_NEGATIVE: str = 'Negative'
 COL_CONFIDENCE_THRESHOLD: str = 'Confidence Threshold'
 COL_UNIFORM: str = 'Uniform'
 COL_ACCURACY: str = 'Accuracy'
-COL_DP_DIFFERENCE: str = 'DP Difference'
+COL_DP_DIFFERENCE: str = 'Demographic Parity Difference'
+COL_TRUE_POS_RATE: str = 'True Positive Rate'
+COL_TRUE_NEG_RATE: str = 'True Negative Rate'
 
-MODELS = {'Unconstrained': 'red', 'DP Constrained': 'blue'}
-METRICS = [COL_ACCURACY, COL_DP_DIFFERENCE]
+MODELS = {'Unconstrained': 'tab:red',
+          'Demographic Parity': 'tab:blue',
+          'Equalized Odds': 'tab:green',
+          'Equality of Opportunity': 'tab:purple',
+          'Error Rate Parity': 'tab:orange'}
+METRICS = [COL_ACCURACY, COL_DP_DIFFERENCE, COL_TRUE_POS_RATE, COL_TRUE_NEG_RATE]

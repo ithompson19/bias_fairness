@@ -1,11 +1,11 @@
 import warnings
 
 import analyzer
-from data_reader import DataReader, SmallAdult
+from data_reader import Adult, DataReader, Debug, SmallAdult
 import plotter
 
 def main():
-    data_reader: DataReader = SmallAdult
+    data_reader: DataReader = Adult
     
     # run_flip_rate_tests(data_reader, flip_min=0.0, flip_max=0.5)
     # run_confidence_interval_tests(data_reader, conf_min=0.2, conf_max=1.0, flip_rate=0.2)
@@ -36,6 +36,8 @@ def run_flip_rate_tests(data_reader: DataReader, flip_min: float, flip_max: floa
     flip_rate_test('Non-White Negative', data_reader, flip_min, flip_max, column='Race', val='-White', pos_test=False)
     
 def run_confidence_interval_tests(data_reader: DataReader, conf_min: float, conf_max: float, flip_rate: float):
+    if conf_min < flip_rate:
+        raise ValueError('Confidence threshold minimum must be greater than flip rate.')
     confidence_interval_test('', data_reader, conf_min, conf_max, ('', '', flip_rate, flip_rate))
     confidence_interval_test('Positive', data_reader, conf_min, conf_max, flip_rate=('', '', flip_rate, 0.0))
     confidence_interval_test('Negative', data_reader, conf_min, conf_max, flip_rate=('', '', 0.0, flip_rate))

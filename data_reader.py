@@ -15,7 +15,7 @@ Debug
 
 from math import isclose
 from pathlib import Path
-from typing import Any, Dict, List, Tuple, cast
+from typing import Any, Dict, List, Tuple
 
 import constants as const
 import pandas as pd
@@ -49,13 +49,14 @@ class DataReader:
         Gets and encodes the sensitive attribute(s) of the test data.
     """
     
-    def __init__(self, 
-                 types: Dict[str, Any], 
-                 training_data_path: str, 
+    def __init__(self,
+                 types: Dict[str, Any],
+                 training_data_path: str,
                  training_data_line_skip: int,
-                 test_data_path: str, 
+                 test_data_path: str,
                  test_data_line_skip: int,
-                 label_column_name: str, 
+                 label_column_name: str,
+                 label_negative_positive: tuple,
                  sensitive_attribute_column_names: List[str]) -> None:
         """
         Parameters
@@ -99,6 +100,8 @@ class DataReader:
             if sensitive_attribute not in self.__features:
                 raise ValueError("Sensitive attribute column names must be a subset of the column names provided in types.")
         self.sensitive_attribute_column_names: List = sensitive_attribute_column_names
+        self.label_negative_positive = label_negative_positive
+        self.__sens_attr_values = {}
         
     def training_data(self) -> Tuple[pd.DataFrame, pd.Series]:
         """Gets and encodes the training data and the label column.
@@ -122,7 +125,7 @@ class DataReader:
         if not all(confidence_threshold >= rate for rate in flip_rate[2:]):
             raise ValueError('Confidence threshold must be greater than or equal to all rates.')
         
-        data, labels, _ = self.read_file(is_test = False)
+        data, labels, _ = self.__read_file(is_test = False)
         if confidence_threshold < 1 and not hasattr(initial_model, "classes_"):
             initial_model.fit(X = data, y = labels)
         
@@ -166,7 +169,12 @@ class DataReader:
         """
         return self.__read_encoded_dataframe(is_test=True)[2]
     
-    def read_file(self, is_test: bool) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
+    def sensitive_attribute_vals(self, attribute_name: str):
+        if attribute_name not in self.sensitive_attribute_column_names:
+            raise ValueError(f'{attribute_name} is not a sensitive attribute.')
+        return self.__sens_attr_values[attribute_name]
+    
+    def __read_file(self, is_test: bool) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
         """Reads the data file at the location of either the training data or test data.
         
         Parameters
@@ -194,20 +202,29 @@ class DataReader:
                             skiprows = self.__test_data_line_skip if is_test else self.__training_data_line_skip)
         except IOError as _:
             raise IOError(f'{"Test" if is_test else "Training"} file not found at the location specified')
-        labels = df[self.label_column_name]
         sensitive_attributes = df[self.sensitive_attribute_column_names]
         
-        self.__sens_attr_values = {}
         for attr_name in self.sensitive_attribute_column_names:
-            attr_values = df[attr_name].unique()
-            for existing_attr_name in self.__sens_attr_values:
-                if frozenset(self.__sens_attr_values[existing_attr_name]).intersection(attr_values):
-                    raise ValueError('Sensitive attribute values must not be shared across sensitive attribute columns.')
-            self.__sens_attr_values[attr_name] = df[attr_name].unique()
-            
-        df[self.label_column_name] = self.__encoder.fit_transform(y = df[self.label_column_name])
+            if attr_name not in self.__sens_attr_values.keys():
+                attr_values = df[attr_name].unique()
+                for existing_attr_name in self.__sens_attr_values:
+                    if frozenset(self.__sens_attr_values[existing_attr_name]).intersection(attr_values):
+                        raise ValueError('Sensitive attribute values must not be shared across sensitive attribute columns.')
+                self.__sens_attr_values[attr_name] = attr_values
         
-        return df, labels, sensitive_attributes
+        df[self.label_column_name] = df[self.label_column_name].map(lambda label: label.strip(' .'))
+        
+        if len(self.label_negative_positive) != 2:
+            raise ValueError('Two values must be provided for positive/negative labels.')
+        for label in self.label_negative_positive:
+            if label not in list(df[self.label_column_name].unique()):
+                raise ValueError('Positive / negative label not in column.')
+            
+        self.__encoder.fit(list(self.label_negative_positive))
+        
+        df[self.label_column_name] = self.__encoder.transform(y = df[self.label_column_name])
+        
+        return df, df[self.label_column_name], sensitive_attributes
     
     def __encode_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
         """Encodes all non-numerical columns in the given Dataframe. 
@@ -242,18 +259,13 @@ class DataReader:
             The encoded data, the encoded label column of the data, and the encoded sensitive attribute(s) of the data.
         """
         
-        data, labels, sensitive_attributes = self.read_file(is_test = is_test)
+        data, labels, sensitive_attributes = self.__read_file(is_test = is_test)
         
         data = self.__encode_dataframe(data)
         labels = self.__encode_dataframe(labels.to_frame()).squeeze()
         sensitive_attributes = self.__encode_dataframe(sensitive_attributes)
         
         return data, labels, sensitive_attributes
-    
-    def get_sensitive_attribute_vals(self, attribute_name: str):
-        if attribute_name not in self.sensitive_attribute_column_names:
-            raise ValueError(f'{attribute_name} is not a sensitive attribute.')
-        return self.__sens_attr_values[attribute_name]
         
 Adult = DataReader(*const.ADULT_PARAMS)
 SmallAdult = DataReader(*const.SMALLADULT_PARAMS)

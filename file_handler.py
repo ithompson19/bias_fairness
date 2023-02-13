@@ -10,7 +10,7 @@ def generate_result_row(data_reader: DataReader, trial_num: int, flip_rate: Tupl
     df: pd.DataFrame = pd.DataFrame(columns=__generate_column_names(data_reader))
     values = [trial_num]
     for column_name in data_reader.sensitive_attribute_column_names:
-        for value in data_reader.get_sensitive_attribute_vals(column_name):
+        for value in data_reader.sensitive_attribute_vals(column_name):
             if flip_rate[0]:
                 if flip_rate[1].startswith('-'):
                     values.append(flip_rate[2] if flip_rate[0] == column_name and flip_rate[1].lstrip('-') != value else 0.0)
@@ -77,7 +77,7 @@ def generate_plot_file_name(results_file_name: str, metric_name: str) -> str:
 def __generate_column_names(data_reader: DataReader) -> List[str]:
     columns: List[str] = [const.COL_TRIAL]
     for column_name in data_reader.sensitive_attribute_column_names:
-        for value in data_reader.get_sensitive_attribute_vals(column_name):
+        for value in data_reader.sensitive_attribute_vals(column_name):
             columns.append(f'{value} {const.COL_POSITIVE} {const.COL_FLIPRATE}')
             columns.append(f'{value} {const.COL_NEGATIVE} {const.COL_FLIPRATE}')
     columns.append(const.COL_CONFIDENCE_THRESHOLD)
