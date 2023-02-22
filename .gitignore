@@ -1,5 +1,7 @@
 .vscode/*
-Results/*
+Models/*
+Metrics/*
+Figures/*
 Debug/*
 
 # https://github.com/github/gitignore/blob/main/Python.gitignore

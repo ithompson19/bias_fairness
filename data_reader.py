@@ -138,7 +138,7 @@ class DataReader:
         
         return data, labels
     
-    def test_data(self) -> Tuple[pd.DataFrame, pd.Series]:
+    def test_data(self) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
         """Gets and encodes the test data and the label column.
         
         Returns
@@ -147,7 +147,7 @@ class DataReader:
             The encoded test data and the encoded label column of the data.
         """
         
-        return self.__read_encoded_dataframe(is_test = True)[:2]
+        return self.__read_encoded_dataframe(is_test = True)
 
     def training_sensitive_attributes(self) -> pd.DataFrame:
         """Gets and encodes the sensitive attribute(s) of the training data.

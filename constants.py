@@ -1,6 +1,8 @@
 """Holds all constants.
 """
 import numpy as np
+from fairlearn.metrics import demographic_parity_difference, equalized_odds_difference, true_positive_rate, false_positive_rate
+from fairlearn.reductions import DemographicParity, EqualizedOdds, FalsePositiveRateParity, TruePositiveRateParity
 
 # ML Models
 MAX_ITER: int = 10000
@@ -10,7 +12,7 @@ DIFFERENCE_BOUND: float = 0.01
 # Analyzer
 TRIAL_COUNT_DEFAULT: int = 10
 TRIAL_MAX_ATTEMPTS: int = 5
-LABEL_BIAS_RANGE_INTERVAL: float = 0.05
+LABEL_BIAS_RANGE_INTERVAL: float = 0.1
 
 
 # Data Reader
@@ -78,10 +80,15 @@ DEBUG_PARAMS = (
 )
 
 # File Handler / Plotter
-DATA_DIR: str = './Data'
+DIR_DATA: str = './Data'
+DIR_MODELS: str = './Models'
+DIR_METRICS: str = './Metrics'
+DIR_FIGURES: str = './Figures'
 
-RESULTS_DIR: str = './Results'
-FLIP_RATE_FILE_NAME: str = 'flip_rate.csv'
+FILE_NAME_MODELS: str = 'trained_models.pkl'
+FILE_NAME_METRICS: str = 'metrics.csv'
+FILE_NAME_FIGURES_ACCURACY: str = 'accuracy.png'
+FILE_NAME_FIGURES_FAIRNESS: str = 'fairness.png'
 
 COL_TRIAL: str = 'Trial'
 COL_FLIPRATE: str = 'Flip Rate'
@@ -89,14 +96,19 @@ COL_POSITIVE: str = 'Positive'
 COL_NEGATIVE: str = 'Negative'
 COL_CONFIDENCE_THRESHOLD: str = 'Confidence Threshold'
 COL_UNIFORM: str = 'Uniform'
+
 COL_ACCURACY: str = 'Accuracy'
 COL_DP_DIFFERENCE: str = 'Demographic Parity Difference'
+COL_EO_DIFFERENCE: str = 'Equalized Odds Difference'
 COL_TRUE_POS_RATE: str = 'True Positive Rate'
-COL_TRUE_NEG_RATE: str = 'True Negative Rate'
+COL_FALSE_POS_RATE: str = 'False Positive Rate'
 
-MODELS = {'Unconstrained': 'tab:red',
-          'Demographic Parity': 'tab:blue',
-          'Equalized Odds': 'tab:green',
-          'Equality of Opportunity': 'tab:purple',
-          'Error Rate Parity': 'tab:orange'}
-METRICS = [COL_ACCURACY, COL_DP_DIFFERENCE, COL_TRUE_POS_RATE, COL_TRUE_NEG_RATE]
+CONSTRAINED_MODELS = {DemographicParity: (demographic_parity_difference, COL_DP_DIFFERENCE),
+                      EqualizedOdds: (equalized_odds_difference, COL_EO_DIFFERENCE),
+                      TruePositiveRateParity: (true_positive_rate, COL_TRUE_POS_RATE),
+                      FalsePositiveRateParity: (false_positive_rate, COL_FALSE_POS_RATE)}
+MODEL_LINES = {'Unconstrained': 'tab:red',
+               'Demographic Parity': 'tab:blue',
+               'Equalized Odds': 'tab:green',
+               'Equality of Opportunity': 'tab:purple',
+               'False Positive Rate Parity': 'tab:orange'}
