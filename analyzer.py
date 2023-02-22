@@ -1,16 +1,12 @@
 import constants as const
 from typing import Tuple
 import multiprocessing as mp
-from multiprocessing import Pool
-from functools import partial
 import model_trainer
 import metric_analyzer
 import figure_generator
 import tests_generator
 
 from data_reader import DataReader
-
-# TODO: multiprocessing Pool for trials, fix printing for that
 
 def analyze_label_bias(data_reader: DataReader,
                        range_min: float | Tuple[str, str, float, float],

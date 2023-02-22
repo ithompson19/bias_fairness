@@ -54,7 +54,7 @@ def generate_metrics_row(data_reader: DataReader, trial_num: int, flip_rate: Tup
         raise ValueError('model_metrics array must include an accuracy measurement for every model, and the appropriate metric for constrained models.')
     df: pd.DataFrame = pd.DataFrame(columns=__generate_column_names(data_reader))
     values = [trial_num]
-    for column_name in data_reader.sensitive_attribute_column_names:
+    for column_name in data_reader.sensitive_attributes:
         for value in data_reader.sensitive_attribute_vals(column_name):
             if flip_rate[0]:
                 if flip_rate[1].startswith('-'):
@@ -132,7 +132,7 @@ def __get_metrics_file_name(tests: List[Tuple[Tuple[str, str, float, float], flo
 
 def __generate_column_names(data_reader: DataReader) -> List[str]:
     columns: List[str] = [const.COL_TRIAL]
-    for column_name in data_reader.sensitive_attribute_column_names:
+    for column_name in data_reader.sensitive_attributes:
         for value in data_reader.sensitive_attribute_vals(column_name):
             columns.append(f'{value} {const.COL_POSITIVE} {const.COL_FLIPRATE}')
             columns.append(f'{value} {const.COL_NEGATIVE} {const.COL_FLIPRATE}')

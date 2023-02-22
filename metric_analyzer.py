@@ -16,13 +16,13 @@ def generate_metrics(data_reader: DataReader,
         return
     except:
         pass
-    print('\nAnalyzing model metrics')
+    print('Analyzing model metrics...')
     test_data, test_labels, test_sensitive_attributes = data_reader.test_data()
     all_models = file_handler.read_models(tests)
     results: pd.DataFrame = pd.DataFrame()
     for trial_num, model_test_groups in all_models:
-        for model_test_group, (flip_rate, confidence_threshold) in zip(model_test_groups, tests):
-            predictions = [model.predict(X = test_data) for model in model_test_group]
+        for trained_models, flip_rate, confidence_threshold in model_test_groups:
+            predictions = [model.predict(X = test_data) for model in trained_models]
             
             model_metrics = [accuracy_score(y_true = test_labels, y_pred = prediction) for prediction in predictions]
             

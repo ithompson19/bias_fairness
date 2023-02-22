@@ -10,10 +10,9 @@ N_JOBS: int = -1
 DIFFERENCE_BOUND: float = 0.01
 
 # Analyzer
-TRIAL_COUNT_DEFAULT: int = 10
+TRIAL_COUNT_DEFAULT: int = 5
 TRIAL_MAX_ATTEMPTS: int = 5
 LABEL_BIAS_RANGE_INTERVAL: float = 0.1
-
 
 # Data Reader
 ADULT_PARAMS = (
@@ -39,7 +38,7 @@ ADULT_PARAMS = (
     1,
     'Target',
     ('<=50K', '>50K'),
-    ['Race', 'Sex'])
+    {'Race': 'White', 'Sex': 'Male'})
 SMALLADULT_PARAMS = (
     {
         'Age': np.int64, 
@@ -63,7 +62,7 @@ SMALLADULT_PARAMS = (
     1,
     'Target',
     ('<=50K', '>50K'),
-    ['Race', 'Sex'])
+    {'Race': 'White', 'Sex': 'Male'})
 DEBUG_PARAMS = (
     {
         'A': np.int64,
@@ -76,7 +75,7 @@ DEBUG_PARAMS = (
     1,
     'C',
     (0, 1),
-    ['B']
+    {'B': '2'}
 )
 
 # File Handler / Plotter
@@ -110,5 +109,5 @@ CONSTRAINED_MODELS = {DemographicParity: (demographic_parity_difference, COL_DP_
 MODEL_LINES = {'Unconstrained': 'tab:red',
                'Demographic Parity': 'tab:blue',
                'Equalized Odds': 'tab:green',
-               'Equality of Opportunity': 'tab:purple',
+               'True Positive Rate Parity': 'tab:purple',
                'False Positive Rate Parity': 'tab:orange'}

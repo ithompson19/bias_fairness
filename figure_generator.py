@@ -7,7 +7,7 @@ import file_handler
 import constants as const
 
 def plot_all(tests: List[Tuple[Tuple[str, str, float, float], float]]):
-    print('Generating figures')
+    print('Generating figures...')
     data, file_name = file_handler.read_metrics(tests)
     __plot_accuracy(data = data, file_name = file_name)
     __plot_fairness(data = data, file_name = file_name)

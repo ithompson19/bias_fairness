@@ -57,7 +57,7 @@ class DataReader:
                  test_data_line_skip: int,
                  label_column_name: str,
                  label_negative_positive: tuple,
-                 sensitive_attribute_column_names: List[str]) -> None:
+                 sensitive_attributes: Dict[str, str]) -> None:
         """
         Parameters
         ----------
@@ -96,12 +96,11 @@ class DataReader:
             raise ValueError("Label column name must be in the column names provided in types.")
         self.label_column_name: str = label_column_name
         
-        for sensitive_attribute in sensitive_attribute_column_names:
-            if sensitive_attribute not in self.__features:
+        for sensitive_attribute_column in sensitive_attributes:
+            if sensitive_attribute_column not in self.__features:
                 raise ValueError("Sensitive attribute column names must be a subset of the column names provided in types.")
-        self.sensitive_attribute_column_names: List = sensitive_attribute_column_names
+        self.sensitive_attributes: Dict[str, str] = sensitive_attributes
         self.label_negative_positive = label_negative_positive
-        self.__sens_attr_values = {}
         
     def training_data(self) -> Tuple[pd.DataFrame, pd.Series]:
         """Gets and encodes the training data and the label column.
@@ -169,10 +168,11 @@ class DataReader:
         """
         return self.__read_encoded_dataframe(is_test=True)[2]
     
-    def sensitive_attribute_vals(self, attribute_name: str):
-        if attribute_name not in self.sensitive_attribute_column_names:
+    def sensitive_attribute_vals(self, attribute_name: str) -> List[str]:
+        if attribute_name not in self.sensitive_attributes:
             raise ValueError(f'{attribute_name} is not a sensitive attribute.')
-        return self.__sens_attr_values[attribute_name]
+        priveledged: str = self.sensitive_attributes[attribute_name]
+        return [priveledged, f'Non-{priveledged}']
     
     def __read_file(self, is_test: bool) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
         """Reads the data file at the location of either the training data or test data.
@@ -202,15 +202,10 @@ class DataReader:
                             skiprows = self.__test_data_line_skip if is_test else self.__training_data_line_skip)
         except IOError as _:
             raise IOError(f'{"Test" if is_test else "Training"} file not found at the location specified')
-        sensitive_attributes = df[self.sensitive_attribute_column_names]
         
-        for attr_name in self.sensitive_attribute_column_names:
-            if attr_name not in self.__sens_attr_values.keys():
-                attr_values = df[attr_name].unique()
-                for existing_attr_name in self.__sens_attr_values:
-                    if frozenset(self.__sens_attr_values[existing_attr_name]).intersection(attr_values):
-                        raise ValueError('Sensitive attribute values must not be shared across sensitive attribute columns.')
-                self.__sens_attr_values[attr_name] = attr_values
+        for sensitive_attribute_column, priveledged_value in self.sensitive_attributes.items():
+            if len(df[sensitive_attribute_column].unique()) > 2:
+                df.loc[df[sensitive_attribute_column] != priveledged_value, sensitive_attribute_column] = f'Non-{priveledged_value}'
         
         df[self.label_column_name] = df[self.label_column_name].map(lambda label: label.strip(' .'))
         
@@ -224,7 +219,7 @@ class DataReader:
         
         df[self.label_column_name] = self.__encoder.transform(y = df[self.label_column_name])
         
-        return df, df[self.label_column_name], sensitive_attributes
+        return df, df[self.label_column_name], df[self.sensitive_attributes.keys()]
     
     def __encode_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
         """Encodes all non-numerical columns in the given Dataframe. 
