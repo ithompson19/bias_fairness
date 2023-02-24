@@ -37,12 +37,12 @@ def __plot(title: str, y_label: str, y_columns: List[str], fairness_plot: bool, 
     _, ax = plt.subplots()
     ax.set(xlabel=x_axis_name, ylabel=y_label)
 
-    grouped_data = data.groupby(x_column_name, as_index=False)[y_columns].agg({y_col: ['min', 'max', 'mean'] for y_col in y_columns})
+    grouped_data = data.groupby(x_column_name, as_index=False)[y_columns].agg({y_col: ['mean', 'std'] for y_col in y_columns})
     
     for (label, color), y_col in zip(list(const.MODEL_LINES.items())[int(fairness_plot):], y_columns):
         ax.fill_between(grouped_data[x_column_name],
-                        grouped_data[y_col]['min'],
-                        grouped_data[y_col]['max'],
+                        grouped_data[y_col]['mean'] - grouped_data[y_col]['std'],
+                        grouped_data[y_col]['mean'] + grouped_data[y_col]['std'],
                         color=mpl.colors.to_rgba(color, 0.15))
         plt.plot(grouped_data[x_column_name], grouped_data[y_col]['mean'], color=color, label=label)
         

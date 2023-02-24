@@ -17,6 +17,8 @@ from math import isclose
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+from sklearn import preprocessing
+
 import constants as const
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
@@ -128,14 +130,12 @@ class DataReader:
         if confidence_threshold < 1 and not hasattr(initial_model, "classes_"):
             initial_model.fit(X = data, y = labels)
         
-        flippable_indexes: List[int] = bias_inducer.get_flippable_indexes(data, self.label_column_name, flip_rate)
+        flippable_indexes: List[int] = bias_inducer.get_flippable_indexes(data, labels, flip_rate)
         data = self.__encode_dataframe(data)
         flippable_indexes = bias_inducer.restrict_flippable_indexes(data, flippable_indexes, initial_model, confidence_threshold)
-        bias_inducer.flip_labels(data, flippable_indexes, flip_rate[2] if flip_rate[2] > 0 else flip_rate[3], self.label_column_name)
+        bias_inducer.flip_labels(labels, flip_rate[2] if flip_rate[2] > 0 else flip_rate[3], flippable_indexes)
         
-        labels = data[self.label_column_name]
-        
-        return data, labels
+        return self.__data_transform(data), labels
     
     def test_data(self) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
         """Gets and encodes the test data and the label column.
@@ -145,7 +145,6 @@ class DataReader:
         Tuple[pandas.DataFrame, pandas.DataFrame]
             The encoded test data and the encoded label column of the data.
         """
-        
         return self.__read_encoded_dataframe(is_test = True)
 
     def training_sensitive_attributes(self) -> pd.DataFrame:
@@ -206,20 +205,22 @@ class DataReader:
         for sensitive_attribute_column, priveledged_value in self.sensitive_attributes.items():
             if len(df[sensitive_attribute_column].unique()) > 2:
                 df.loc[df[sensitive_attribute_column] != priveledged_value, sensitive_attribute_column] = f'Non-{priveledged_value}'
+                
+        labels = df[self.label_column_name]
+        df = df.loc[:, df.columns != self.label_column_name]
         
-        df[self.label_column_name] = df[self.label_column_name].map(lambda label: label.strip(' .'))
+        labels = labels.map(lambda label: label.strip(' .'))
         
         if len(self.label_negative_positive) != 2:
             raise ValueError('Two values must be provided for positive/negative labels.')
         for label in self.label_negative_positive:
-            if label not in list(df[self.label_column_name].unique()):
+            if label not in list(labels.unique()):
                 raise ValueError('Positive / negative label not in column.')
             
         self.__encoder.fit(list(self.label_negative_positive))
+        labels = self.__encoder.transform(y = labels)
         
-        df[self.label_column_name] = self.__encoder.transform(y = df[self.label_column_name])
-        
-        return df, df[self.label_column_name], df[self.sensitive_attributes.keys()]
+        return df, pd.Series(labels), df[self.sensitive_attributes.keys()]
     
     def __encode_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
         """Encodes all non-numerical columns in the given Dataframe. 
@@ -257,10 +258,18 @@ class DataReader:
         data, labels, sensitive_attributes = self.__read_file(is_test = is_test)
         
         data = self.__encode_dataframe(data)
+        data = self.__data_transform(data)
         labels = self.__encode_dataframe(labels.to_frame()).squeeze()
         sensitive_attributes = self.__encode_dataframe(sensitive_attributes)
         
         return data, labels, sensitive_attributes
+    
+    def __data_transform(self, df):
+        binary_data = pd.get_dummies(df)
+        feature_cols = binary_data[binary_data.columns[:-2]]
+        scaler = preprocessing.StandardScaler()
+        data = pd.DataFrame(scaler.fit_transform(feature_cols), columns=feature_cols.columns)
+        return data
         
 Adult = DataReader(*const.ADULT_PARAMS)
 SmallAdult = DataReader(*const.SMALLADULT_PARAMS)

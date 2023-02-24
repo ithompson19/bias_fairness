@@ -4,7 +4,7 @@ import analyzer
 from data_reader import Adult, DataReader, Debug, SmallAdult
 
 def main():
-    data_reader: DataReader = SmallAdult
+    data_reader: DataReader = Adult
     
     run_flip_rate_tests_race(data_reader, col = 'Sex', val = 'Male', flip_min=0.0, flip_max=0.5)
     # run_confidence_interval_tests_race(data_reader, col = 'Sex', val = 'Male', conf_min=0.2, conf_max=1.0, flip_rate=0.2)

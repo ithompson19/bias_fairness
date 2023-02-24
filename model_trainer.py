@@ -75,5 +75,5 @@ def __label_bias_fetch_train_constrain(flip_rate: Tuple[str, str, float, float],
         except:
             continue
         break
-    print('#' if failures < const.TRIAL_MAX_ATTEMPTS else 'X', end='', flush=True)
+    print('#' if failures < const.TRIAL_MAX_ATTEMPTS - 1 else 'X', end='', flush=True)
     return (trained_models if failures < const.TRIAL_MAX_ATTEMPTS else [], flip_rate, confidence_threshold), failures

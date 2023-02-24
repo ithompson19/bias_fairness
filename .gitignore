@@ -3,6 +3,7 @@ Models/*
 Metrics/*
 Figures/*
 Debug/*
+t.py
 
 # https://github.com/github/gitignore/blob/main/Python.gitignore
 

@@ -17,14 +17,15 @@ def prepare_model_directory(tests: List[Tuple[Tuple[str, str, float, float], flo
     try:
         os.makedirs(dir_name)
     except FileExistsError:
-        min_unused_dir_num = 1
-        new_dir_name: str = f'{dir_name} ({min_unused_dir_num})'
-        while os.path.isfile(new_dir_name):
-            min_unused_dir_num += 1
+        if len(os.listdir(dir_name)) > 0:
+            min_unused_dir_num = 1
             new_dir_name: str = f'{dir_name} ({min_unused_dir_num})'
-        print(f'Moving existing directory to {new_dir_name}')
-        os.rename(dir_name, new_dir_name)
-        os.makedirs(dir_name)
+            while os.path.isfile(new_dir_name):
+                min_unused_dir_num += 1
+                new_dir_name: str = f'{dir_name} ({min_unused_dir_num})'
+            print(f'Moving existing directory to {new_dir_name}')
+            os.rename(dir_name, new_dir_name)
+            os.makedirs(dir_name)
 
 def save_models(tests: List[Tuple[Tuple[str, str, float, float], float]], trial_num: int, models: list):
     file_name: str = __get_models_file_name(tests, trial_num)
@@ -192,6 +193,8 @@ def __move_file_if_exists(file_name: str):
         new_file_name = os.path.join(file_name[:-len(base_name) - 1], new_file_name)
         while os.path.isfile(new_file_name):
             min_unused_file_num += 1
-            new_file_name: str = f'{file_name} ({min_unused_file_num})'
+            base_name: str = os.path.basename(file_name)
+            new_file_name: str = f'{base_name.split(".")[0]}_{min_unused_file_num}.{base_name.split(".")[1]}'
+            new_file_name = os.path.join(file_name[:-len(base_name) - 1], new_file_name)
         print(f'Moving existing file to {new_file_name}')
         os.rename(file_name, new_file_name)
