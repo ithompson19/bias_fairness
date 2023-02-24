@@ -6,6 +6,7 @@ from itertools import islice
 import file_handler
 import constants as const
 
+# TODO: add check for if the files already exist
 def plot_all(tests: List[Tuple[Tuple[str, str, float, float], float]]):
     print('Generating figures...')
     data, file_name = file_handler.read_metrics(tests)

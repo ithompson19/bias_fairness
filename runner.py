@@ -29,7 +29,7 @@ def run_flip_rate_tests_race(data_reader: DataReader, col: str, val: str, flip_m
     # flip_rate_test('White', data_reader, flip_min, flip_max, column='Race', val='White')
     # flip_rate_test('Non-White', data_reader, flip_min, flip_max, column='Race', val='-White')
     # flip_rate_test('White Positive', data_reader, flip_min, flip_max, column='Race', val='White', neg_test=False)
-    flip_rate_test(f'{val} Negative', data_reader, flip_min, flip_max, column=col, val=val, pos_test=False)
+    # flip_rate_test(f'{val} Negative', data_reader, flip_min, flip_max, column=col, val=val, pos_test=False)
     flip_rate_test(f'Non-{val} Positive', data_reader, flip_min, flip_max, column=col, val=f'-{val}', neg_test=False)
     # flip_rate_test('Non-White Negative', data_reader, flip_min, flip_max, column='Race', val='-White', pos_test=False)
     
