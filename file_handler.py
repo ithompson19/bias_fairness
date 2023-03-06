@@ -53,20 +53,19 @@ def read_models(tests: List[Tuple[Tuple[str, str, float, float], float]]) -> lis
 def generate_metrics_row(data_reader: DataReader, trial_num: int, flip_rate: Tuple[str, str, float, float], confidence_threshold: float, model_metrics: List[float]) -> pd.DataFrame:
     if len(model_metrics) != len(const.MODEL_LINES) + len(const.CONSTRAINED_MODELS):
         raise ValueError('model_metrics array must include an accuracy measurement for every model, and the appropriate metric for constrained models.')
-    df: pd.DataFrame = pd.DataFrame(columns=__generate_column_names(data_reader))
+    df: pd.DataFrame = pd.DataFrame(columns=__generate_column_names(data_reader, flip_rate))
     values = [trial_num]
-    for column_name in data_reader.sensitive_attributes:
-        for value in data_reader.sensitive_attribute_vals(column_name):
-            if flip_rate[0]:
-                if flip_rate[1].startswith('-'):
-                    values.append(flip_rate[2] if flip_rate[0] == column_name and flip_rate[1].lstrip('-') != value else 0.0)
-                    values.append(flip_rate[3] if flip_rate[0] == column_name and flip_rate[1].lstrip('-') != value else 0.0)
-                else:
-                    values.append(flip_rate[2] if flip_rate[0] == column_name and flip_rate[1] == value else 0.0)
-                    values.append(flip_rate[3] if flip_rate[0] == column_name and flip_rate[1] == value else 0.0)
+    for value in data_reader.sensitive_attribute_vals(flip_rate[0]):
+        if flip_rate[0]:
+            if flip_rate[1].startswith('-'):
+                values.append(flip_rate[2] if flip_rate[1].lstrip('-') != value else 0.0)
+                values.append(flip_rate[3] if flip_rate[1].lstrip('-') != value else 0.0)
             else:
-                values.append(flip_rate[2])
-                values.append(flip_rate[3])
+                values.append(flip_rate[2] if flip_rate[1] == value else 0.0)
+                values.append(flip_rate[3] if flip_rate[1] == value else 0.0)
+        else:
+            values.append(flip_rate[2])
+            values.append(flip_rate[3])
     values.append(confidence_threshold)
     values.extend(model_metrics)
     df.loc[0] = values
@@ -131,12 +130,11 @@ def __get_metrics_file_name(tests: List[Tuple[Tuple[str, str, float, float], flo
         __move_file_if_exists(file_name)
     return file_name
 
-def __generate_column_names(data_reader: DataReader) -> List[str]:
+def __generate_column_names(data_reader: DataReader, flip_rate: Tuple[str, str, float, float]) -> List[str]:
     columns: List[str] = [const.COL_TRIAL]
-    for column_name in data_reader.sensitive_attributes:
-        for value in data_reader.sensitive_attribute_vals(column_name):
-            columns.append(f'{value} {const.COL_POSITIVE} {const.COL_FLIPRATE}')
-            columns.append(f'{value} {const.COL_NEGATIVE} {const.COL_FLIPRATE}')
+    for value in data_reader.sensitive_attribute_vals(flip_rate[0]):
+        columns.append(f'{value} {const.COL_POSITIVE} {const.COL_FLIPRATE}')
+        columns.append(f'{value} {const.COL_NEGATIVE} {const.COL_FLIPRATE}')
     columns.append(const.COL_CONFIDENCE_THRESHOLD)
     for model in const.MODEL_LINES:
         columns.append(f'{model} {const.COL_ACCURACY}')

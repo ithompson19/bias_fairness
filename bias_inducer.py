@@ -7,7 +7,7 @@ label_bias(model: LogisticRegression, data: pd.DataFrame, label_column_name: str
 """
 from math import isclose
 import random
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 
 import numpy as np
 import pandas as pd

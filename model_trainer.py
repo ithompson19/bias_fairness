@@ -45,7 +45,7 @@ def __label_bias_trial(trial_num: int,
     async_result = pool.starmap_async(partial(__label_bias_fetch_train_constrain,
                                data_reader=data_reader,
                                initial_estimator=initial_estimator,
-                               training_sensitive_attributes=data_reader.training_sensitive_attributes()),
+                               training_sensitive_attributes=data_reader.training_sensitive_attributes(tests[0][0][0])),
                        tests)
     async_result.wait()
     return_value = async_result.get()

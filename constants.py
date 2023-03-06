@@ -39,7 +39,7 @@ ADULT_PARAMS = (
     'Target',
     ('<=50K', '>50K'),
     {'Race': 'White', 'Sex': 'Male'})
-SMALLADULT_PARAMS = (
+SMALLADULTEVEN_PARAMS = (
     {
         'Age': np.int64, 
         'Workclass': 'string',
@@ -56,9 +56,33 @@ SMALLADULT_PARAMS = (
         'Hours per week': np.int64,
         'Country': 'string',
         'Target': 'string' },
-    './Data/SmallAdult/adult.data',
+    './Data/SmallAdultEven/adult.data',
     0,
-    './Data/SmallAdult/adult.test',
+    './Data/SmallAdultEven/adult.test',
+    1,
+    'Target',
+    ('<=50K', '>50K'),
+    {'Race': 'White', 'Sex': 'Male'})
+SMALLADULTPROP_PARAMS = (
+    {
+        'Age': np.int64, 
+        'Workclass': 'string',
+        'fnlwgt': np.int64,
+        'Education': 'string',
+        'Education-Num': np.int64,
+        'Marital Status': 'string',
+        'Occupation': 'string',
+        'Relationship': 'string',
+        'Race': 'string',
+        'Sex': 'string',
+        'Capital Gain': np.int64,
+        'Capital Loss': np.int64,
+        'Hours per week': np.int64,
+        'Country': 'string',
+        'Target': 'string' },
+    './Data/SmallAdultProp/adult.data',
+    0,
+    './Data/SmallAdultProp/adult.test',
     1,
     'Target',
     ('<=50K', '>50K'),

@@ -80,7 +80,6 @@ class DataReader:
             If the file path to the training or test data does not exist, or the column names provided in label_column_names or sensitive_attribute_column_names are not a subset of the column names provided in types.
         """
         
-        self.__encoder: LabelEncoder = LabelEncoder()
         self.__types: Dict[str, Any] = types
         self.__features: list = list(types.keys())
         
@@ -137,7 +136,7 @@ class DataReader:
         
         return self.__data_transform(data), labels
     
-    def test_data(self) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
+    def test_data(self, sensitive_attribute_column: str) -> Tuple[pd.DataFrame, pd.Series, pd.Series]:
         """Gets and encodes the test data and the label column.
         
         Returns
@@ -145,9 +144,10 @@ class DataReader:
         Tuple[pandas.DataFrame, pandas.DataFrame]
             The encoded test data and the encoded label column of the data.
         """
-        return self.__read_encoded_dataframe(is_test = True)
+        data, labels, sensitive_attributes = self.__read_encoded_dataframe(is_test = True)
+        return data, labels, sensitive_attributes[sensitive_attribute_column]
 
-    def training_sensitive_attributes(self) -> pd.DataFrame:
+    def training_sensitive_attributes(self, sensitive_attribute_column: str) -> pd.Series:
         """Gets and encodes the sensitive attribute(s) of the training data.
         
         Returns
@@ -155,9 +155,9 @@ class DataReader:
         pandas.DataFrame
             The encoded sensitive attribue(s) of the training data.
         """
-        return self.__read_encoded_dataframe(is_test=False)[2]
+        return self.__read_encoded_dataframe(is_test=False)[2][sensitive_attribute_column]
     
-    def test_sensitive_attributes(self) -> pd.DataFrame:
+    def test_sensitive_attributes(self, sensitive_attribute_column: str) -> pd.Series:
         """Gets and encodes the sensitive attribute(s) of the test data.
         
         Returns
@@ -165,13 +165,12 @@ class DataReader:
         pandas.DataFrame
             The encoded sensitive attribue(s) of the test data.
         """
-        return self.__read_encoded_dataframe(is_test=True)[2]
+        return self.__read_encoded_dataframe(is_test=True)[2][sensitive_attribute_column]
     
-    def sensitive_attribute_vals(self, attribute_name: str) -> List[str]:
-        if attribute_name not in self.sensitive_attributes:
-            raise ValueError(f'{attribute_name} is not a sensitive attribute.')
-        priveledged: str = self.sensitive_attributes[attribute_name]
-        return [priveledged, f'Non-{priveledged}']
+    def sensitive_attribute_vals(self, sensitive_attribute_column: str) -> List[str]:
+        if sensitive_attribute_column not in self.sensitive_attributes:
+            raise ValueError(f'{sensitive_attribute_column} is not a sensitive attribute.')
+        return self.__sensitive_attribute_values[sensitive_attribute_column]
     
     def __read_file(self, is_test: bool) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
         """Reads the data file at the location of either the training data or test data.
@@ -202,9 +201,14 @@ class DataReader:
         except IOError as _:
             raise IOError(f'{"Test" if is_test else "Training"} file not found at the location specified')
         
+        self.__sensitive_attribute_values = {}
         for sensitive_attribute_column, priveledged_value in self.sensitive_attributes.items():
-            if len(df[sensitive_attribute_column].unique()) > 2:
+            col_unique_values = df[sensitive_attribute_column].unique()
+            if len(col_unique_values) > 2:
                 df.loc[df[sensitive_attribute_column] != priveledged_value, sensitive_attribute_column] = f'Non-{priveledged_value}'
+                self.__sensitive_attribute_values[sensitive_attribute_column] = [priveledged_value, f'Non-{priveledged_value}']
+            else:
+                self.__sensitive_attribute_values[sensitive_attribute_column] = col_unique_values
                 
         labels = df[self.label_column_name]
         df = df.loc[:, df.columns != self.label_column_name]
@@ -216,9 +220,10 @@ class DataReader:
         for label in self.label_negative_positive:
             if label not in list(labels.unique()):
                 raise ValueError('Positive / negative label not in column.')
-            
-        self.__encoder.fit(list(self.label_negative_positive))
-        labels = self.__encoder.transform(y = labels)
+        
+        encoder: LabelEncoder = LabelEncoder()
+        encoder.fit(list(self.label_negative_positive))
+        labels = encoder.transform(y = labels)
         
         return df, pd.Series(labels), df[self.sensitive_attributes.keys()]
     
@@ -238,7 +243,8 @@ class DataReader:
         
         for colName in df.columns:
             if not pd.api.types.is_numeric_dtype(df[colName]):
-                df[colName] = self.__encoder.fit_transform(y = df[colName])
+                encoder: LabelEncoder = LabelEncoder()
+                df[colName] = encoder.fit_transform(y = df[colName])
         return df
     
     def __read_encoded_dataframe(self, is_test: bool) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
@@ -266,11 +272,12 @@ class DataReader:
     
     def __data_transform(self, df):
         binary_data = pd.get_dummies(df)
-        feature_cols = binary_data[binary_data.columns[:-2]]
+        feature_cols = binary_data[binary_data.columns]
         scaler = preprocessing.StandardScaler()
         data = pd.DataFrame(scaler.fit_transform(feature_cols), columns=feature_cols.columns)
         return data
         
 Adult = DataReader(*const.ADULT_PARAMS)
-SmallAdult = DataReader(*const.SMALLADULT_PARAMS)
+SmallAdultEven = DataReader(*const.SMALLADULTEVEN_PARAMS)
+SmallAdultProp = DataReader(*const.SMALLADULTPROP_PARAMS)
 Debug = DataReader(*const.DEBUG_PARAMS)

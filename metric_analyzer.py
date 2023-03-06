@@ -17,8 +17,9 @@ def generate_metrics(data_reader: DataReader,
     except:
         pass
     print('Analyzing model metrics...')
-    test_data, test_labels, test_sensitive_attributes = data_reader.test_data()
+    test_data, test_labels, test_sensitive_attributes = data_reader.test_data(tests[0][0][0])
     all_models = file_handler.read_models(tests)
+    all_models.sort(key = lambda x: x[0])
     results: pd.DataFrame = pd.DataFrame()
     for trial_num, model_test_groups in all_models:
         for trained_models, flip_rate, confidence_threshold in model_test_groups:
