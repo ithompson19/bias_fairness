@@ -10,7 +10,7 @@ N_JOBS: int = -1
 DIFFERENCE_BOUND: float = 0.01
 
 # Analyzer
-TRIAL_COUNT_DEFAULT: int = 10
+TRIAL_COUNT_DEFAULT: int = 1
 TRIAL_MAX_ATTEMPTS: int = 5
 LABEL_BIAS_RANGE_INTERVAL: float = 0.1
 
@@ -115,8 +115,8 @@ FILE_NAME_FIGURES_FAIRNESS: str = 'fairness.png'
 
 COL_TRIAL: str = 'Trial'
 COL_FLIPRATE: str = 'Flip Rate'
-COL_POSITIVE: str = 'Positive'
-COL_NEGATIVE: str = 'Negative'
+COL_QUALIFIED: str = 'Qualified'
+COL_UNQUALIFIED: str = 'Unqualified'
 COL_CONFIDENCE_THRESHOLD: str = 'Confidence Threshold'
 COL_UNIFORM: str = 'Uniform'
 

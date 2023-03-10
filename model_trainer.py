@@ -10,17 +10,17 @@ from fairlearn.reductions import ExponentiatedGradient
 from sklearn.linear_model import LogisticRegression
 from data_reader import DataReader
 
-def label_bias_train(trial_count: int,
-                     data_reader: DataReader,
+def label_bias_train(data_reader: DataReader,
                      tests: List[Tuple[Tuple[str, str, float, float], float]],
+                     trial_count: int,
                      cpu_count: int):
     try:
-        file_handler.read_models(tests)
+        file_handler.read_models(data_reader, tests)
         print('Trained models found')
         return
     except FileNotFoundError:
         pass
-    file_handler.prepare_model_directory(tests)
+    file_handler.prepare_model_directory(data_reader, tests)
     print('\nTraining models...')
     print('[', ' '*trial_count*len(tests), ']', sep='', end="\r", flush=True)
     print('[', sep='', end='', flush=True)
@@ -50,7 +50,7 @@ def __label_bias_trial(trial_num: int,
     async_result.wait()
     return_value = async_result.get()
     trained_models, num_failures = zip(*return_value)
-    file_handler.save_models(tests, trial_num, trained_models)
+    file_handler.save_models(data_reader, tests, trial_num, trained_models)
     return sum(num_failures)
 
 def __label_bias_fetch_train_constrain(flip_rate: Tuple[str, str, float, float],

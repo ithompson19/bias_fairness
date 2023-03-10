@@ -16,6 +16,6 @@ def analyze_label_bias(data_reader: DataReader,
                        trial_count: int = const.TRIAL_COUNT_DEFAULT,
                        cpu_count: int = mp.cpu_count()):
     tests = tests_generator.generate_tests(range_interval, range_min, range_max, confidence_interval_test_flip_rate)
-    model_trainer.label_bias_train(trial_count, data_reader, tests, cpu_count)
+    model_trainer.label_bias_train(data_reader, tests, trial_count, cpu_count)
     metric_analyzer.generate_metrics(data_reader, tests)
-    figure_generator.plot_all(tests)
+    figure_generator.plot_all(data_reader, tests)

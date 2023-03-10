@@ -58,7 +58,7 @@ class DataReader:
                  test_data_path: str,
                  test_data_line_skip: int,
                  label_column_name: str,
-                 label_negative_positive: tuple,
+                 label_unqualified_qualified: tuple,
                  sensitive_attributes: Dict[str, str]) -> None:
         """
         Parameters
@@ -101,7 +101,7 @@ class DataReader:
             if sensitive_attribute_column not in self.__features:
                 raise ValueError("Sensitive attribute column names must be a subset of the column names provided in types.")
         self.sensitive_attributes: Dict[str, str] = sensitive_attributes
-        self.label_negative_positive = label_negative_positive
+        self.label_unqualified_qualified = label_unqualified_qualified
         
     def training_data(self) -> Tuple[pd.DataFrame, pd.Series]:
         """Gets and encodes the training data and the label column.
@@ -170,7 +170,12 @@ class DataReader:
     def sensitive_attribute_vals(self, sensitive_attribute_column: str) -> List[str]:
         if sensitive_attribute_column not in self.sensitive_attributes:
             raise ValueError(f'{sensitive_attribute_column} is not a sensitive attribute.')
+        if not hasattr(self, '__sensitive_attribute_values'):
+            self.__read_file(True)
         return self.__sensitive_attribute_values[sensitive_attribute_column]
+    
+    def directory(self) -> str:
+        return self.__training_path.parent.name
     
     def __read_file(self, is_test: bool) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
         """Reads the data file at the location of either the training data or test data.
@@ -202,27 +207,27 @@ class DataReader:
             raise IOError(f'{"Test" if is_test else "Training"} file not found at the location specified')
         
         self.__sensitive_attribute_values = {}
-        for sensitive_attribute_column, priveledged_value in self.sensitive_attributes.items():
+        for sensitive_attribute_column, advantaged_value in self.sensitive_attributes.items():
             col_unique_values = df[sensitive_attribute_column].unique()
             if len(col_unique_values) > 2:
-                df.loc[df[sensitive_attribute_column] != priveledged_value, sensitive_attribute_column] = f'Non-{priveledged_value}'
-                self.__sensitive_attribute_values[sensitive_attribute_column] = [priveledged_value, f'Non-{priveledged_value}']
+                df.loc[df[sensitive_attribute_column] != advantaged_value, sensitive_attribute_column] = f'Non-{advantaged_value}'
+                self.__sensitive_attribute_values[sensitive_attribute_column] = [advantaged_value, f'Non-{advantaged_value}']
             else:
                 self.__sensitive_attribute_values[sensitive_attribute_column] = col_unique_values
                 
         labels = df[self.label_column_name]
         df = df.loc[:, df.columns != self.label_column_name]
         
-        labels = labels.map(lambda label: label.strip(' .'))
+        labels = labels.map(lambda label: label.strip(' .') if type(label) is str else label)
         
-        if len(self.label_negative_positive) != 2:
-            raise ValueError('Two values must be provided for positive/negative labels.')
-        for label in self.label_negative_positive:
+        if len(self.label_unqualified_qualified) != 2:
+            raise ValueError('Two values must be provided for qualified/unqualified labels.')
+        for label in self.label_unqualified_qualified:
             if label not in list(labels.unique()):
-                raise ValueError('Positive / negative label not in column.')
+                raise ValueError('Qualified / unqualified label not in column.')
         
         encoder: LabelEncoder = LabelEncoder()
-        encoder.fit(list(self.label_negative_positive))
+        encoder.fit(list(self.label_unqualified_qualified))
         labels = encoder.transform(labels)
         
         return df, pd.Series(labels), df[self.sensitive_attributes.keys()]

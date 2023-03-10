@@ -2,14 +2,14 @@ from typing import List, Tuple
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import pandas as pd
-from itertools import islice
+from data_reader import DataReader
 import file_handler
 import constants as const
 
 # TODO: add check for if the files already exist
-def plot_all(tests: List[Tuple[Tuple[str, str, float, float], float]]):
+def plot_all(data_reader: DataReader, tests: List[Tuple[Tuple[str, str, float, float], float]]):
     print('Generating figures...')
-    data, file_name = file_handler.read_metrics(tests)
+    data, file_name = file_handler.read_metrics(data_reader, tests)
     __plot_accuracy(data = data, file_name = file_name)
     __plot_fairness(data = data, file_name = file_name)
         

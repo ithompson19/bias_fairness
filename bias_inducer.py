@@ -41,15 +41,15 @@ def get_flippable_indexes(data: pd.DataFrame, labels: pd.Series, flip_rate: Tupl
         raise ValueError(f'Value {flip_rate[1]} does not exist in column {flip_rate[0]}')
     flippable_data = data
     if flip_rate[2] != 0 and flip_rate[3] == 0:
-        positive_label_indexes = labels.loc[labels == 1].index
-        flippable_data = flippable_data.iloc[positive_label_indexes]
+        qualified_label_indexes = labels.loc[labels == 1].index
+        flippable_data = flippable_data.iloc[qualified_label_indexes]
     elif flip_rate[3] != 0 and flip_rate[2] == 0:
-        negative_label_indexes = labels.loc[labels == 0].index
-        flippable_data = flippable_data.iloc[negative_label_indexes]
+        unqualified_label_indexes = labels.loc[labels == 0].index
+        flippable_data = flippable_data.iloc[unqualified_label_indexes]
     col: str = flip_rate[0]
-    privileged_val: str = flip_rate[1].lstrip('-')
-    is_privileged: bool = not flip_rate[1].startswith('-')
-    flippable_data: pd.DataFrame = flippable_data.loc[(flippable_data[col] == privileged_val) == is_privileged] if flip_rate[1] else flippable_data
+    advantaged_val: str = flip_rate[1].lstrip('-')
+    is_advantaged: bool = not flip_rate[1].startswith('-')
+    flippable_data: pd.DataFrame = flippable_data.loc[(flippable_data[col] == advantaged_val) == is_advantaged] if flip_rate[1] else flippable_data
     return list(flippable_data.index)
 
 def restrict_flippable_indexes(data: pd.DataFrame,

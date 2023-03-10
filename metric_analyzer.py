@@ -18,7 +18,7 @@ def generate_metrics(data_reader: DataReader,
         pass
     print('Analyzing model metrics...')
     test_data, test_labels, test_sensitive_attributes = data_reader.test_data(tests[0][0][0])
-    all_models = file_handler.read_models(tests)
+    all_models = file_handler.read_models(data_reader, tests)
     all_models.sort(key = lambda x: x[0])
     results: pd.DataFrame = pd.DataFrame()
     for trial_num, model_test_groups in all_models:
@@ -44,4 +44,4 @@ def generate_metrics(data_reader: DataReader,
                                                              flip_rate=flip_rate,
                                                              confidence_threshold=confidence_threshold,
                                                              model_metrics=model_metrics), ignore_index=True)
-    file_handler.save_metrics(tests, results)
+    file_handler.save_metrics(data_reader, tests, results)

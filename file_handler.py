@@ -8,12 +8,16 @@ from data_reader import DataReader
 
 # MODELS
 
-def prepare_model_directory(tests: List[Tuple[Tuple[str, str, float, float], float]]):
+def prepare_model_directory(data_reader: DataReader, tests: List[Tuple[Tuple[str, str, float, float], float]]):
     try:
         os.makedirs(const.DIR_MODELS)
     except FileExistsError:
         pass
-    dir_name: str = os.path.join(const.DIR_MODELS, __generate_file_prefix(tests))
+    try:
+        os.makedirs(os.path.join(const.DIR_MODELS, data_reader.directory()))
+    except FileExistsError:
+        pass
+    dir_name: str = os.path.join(const.DIR_MODELS, data_reader.directory(), __generate_file_prefix(data_reader, tests))
     try:
         os.makedirs(dir_name)
     except FileExistsError:
@@ -27,14 +31,14 @@ def prepare_model_directory(tests: List[Tuple[Tuple[str, str, float, float], flo
             os.rename(dir_name, new_dir_name)
             os.makedirs(dir_name)
 
-def save_models(tests: List[Tuple[Tuple[str, str, float, float], float]], trial_num: int, models: list):
-    file_name: str = __get_models_file_name(tests, trial_num)
+def save_models(data_reader: DataReader, tests: List[Tuple[Tuple[str, str, float, float], float]], trial_num: int, models: list):
+    file_name: str = __get_models_file_name(data_reader, tests, trial_num)
     models_file = open(file_name, 'wb')
     dill.dump(models, models_file)
     models_file.close()
 
-def read_models(tests: List[Tuple[Tuple[str, str, float, float], float]]) -> list:
-    dir_name: str = os.path.join(const.DIR_MODELS, __generate_file_prefix(tests))
+def read_models(data_reader: DataReader, tests: List[Tuple[Tuple[str, str, float, float], float]]) -> list:
+    dir_name: str = os.path.join(const.DIR_MODELS, data_reader.directory(), __generate_file_prefix(data_reader, tests))
     if not os.path.isdir(dir_name):
         raise FileNotFoundError('Directory corresponding to provided tests cannot be found.')
     file_names: List[Tuple[int, str]] = __get_file_names_from_model_directory(dir_name)
@@ -71,13 +75,13 @@ def generate_metrics_row(data_reader: DataReader, trial_num: int, flip_rate: Tup
     df.loc[0] = values
     return df
 
-def save_metrics(tests: List[Tuple[Tuple[str, str, float, float], float]], metrics: pd.DataFrame):
-    metrics.to_csv(__get_metrics_file_name(tests, True))
+def save_metrics(data_reader: DataReader, tests: List[Tuple[Tuple[str, str, float, float], float]], metrics: pd.DataFrame):
+    metrics.to_csv(__get_metrics_file_name(data_reader, tests, True))
     
-def read_metrics(tests: List[Tuple[Tuple[str, str, float, float], float]]) -> Tuple[pd.DataFrame, str]:
+def read_metrics(data_reader: DataReader, tests: List[Tuple[Tuple[str, str, float, float], float]]) -> Tuple[pd.DataFrame, str]:
     if not os.path.isdir(const.DIR_METRICS):
         raise FileNotFoundError('Metrics directory does not exist. Models must be analyzed first.')
-    file_name = __get_metrics_file_name(tests, False)
+    file_name = __get_metrics_file_name(data_reader, tests, False)
     return pd.read_csv(file_name), file_name
 
 # FIGURES
@@ -92,6 +96,7 @@ def generate_figure_x_axis_name(metrics_file_name: str) -> str:
             keywords[i] = '-'.join([subword.capitalize() for subword in keyword.split('-')])
     if keywords[0] == const.COL_CONFIDENCE_THRESHOLD:
         return f'{keywords[0]} ({" ".join(keywords[1:])})'
+    keywords.append(const.COL_FLIPRATE)
     return ' '.join(keywords)
 
 def find_figure_x_column(data: pd.DataFrame) -> str:
@@ -107,10 +112,10 @@ def save_figure(metrics_file_name: str, fairness_plot: bool):
 
 # HELPERS (MODELS)
 
-def __get_models_file_name(tests: List[Tuple[Tuple[str, str, float, float], float]], trial_num: int) -> str:
+def __get_models_file_name(data_reader: DataReader, tests: List[Tuple[Tuple[str, str, float, float], float]], trial_num: int) -> str:
     split_name = const.FILE_NAME_MODELS.split('.')
     file_name = f'{split_name[0]}_{trial_num}.{split_name[1]}'
-    return os.path.join(const.DIR_MODELS, __generate_file_prefix(tests), file_name)
+    return os.path.join(const.DIR_MODELS, data_reader.directory(), __generate_file_prefix(data_reader, tests), file_name)
 
 def __get_file_names_from_model_directory(dir_name: str) -> List[Tuple[int, str]]:
     file_names: List[Tuple[int, str]] = []
@@ -120,12 +125,16 @@ def __get_file_names_from_model_directory(dir_name: str) -> List[Tuple[int, str]
 
 # HELPERS (METRICS)
 
-def __get_metrics_file_name(tests: List[Tuple[Tuple[str, str, float, float], float]], move: bool) -> str:
+def __get_metrics_file_name(data_reader: DataReader, tests: List[Tuple[Tuple[str, str, float, float], float]], move: bool) -> str:
     try:
         os.makedirs(const.DIR_METRICS)
     except FileExistsError:
         pass
-    file_name: str = os.path.join(const.DIR_METRICS, f'{__generate_file_prefix(tests)}_{const.FILE_NAME_METRICS}')
+    try:
+        os.makedirs(os.path.join(const.DIR_METRICS, data_reader.directory()))
+    except FileExistsError:
+        pass
+    file_name: str = os.path.join(const.DIR_METRICS, data_reader.directory(), f'{__generate_file_prefix(data_reader, tests)}_{const.FILE_NAME_METRICS}')
     if move:
         __move_file_if_exists(file_name)
     return file_name
@@ -133,8 +142,8 @@ def __get_metrics_file_name(tests: List[Tuple[Tuple[str, str, float, float], flo
 def __generate_column_names(data_reader: DataReader, flip_rate: Tuple[str, str, float, float]) -> List[str]:
     columns: List[str] = [const.COL_TRIAL]
     for value in data_reader.sensitive_attribute_vals(flip_rate[0]):
-        columns.append(f'{value} {const.COL_POSITIVE} {const.COL_FLIPRATE}')
-        columns.append(f'{value} {const.COL_NEGATIVE} {const.COL_FLIPRATE}')
+        columns.append(f'{value} {const.COL_QUALIFIED} {const.COL_FLIPRATE}')
+        columns.append(f'{value} {const.COL_UNQUALIFIED} {const.COL_FLIPRATE}')
     columns.append(const.COL_CONFIDENCE_THRESHOLD)
     for model in const.MODEL_LINES:
         columns.append(f'{model} {const.COL_ACCURACY}')
@@ -149,35 +158,52 @@ def __get_figure_file_name(metrics_file_name: str, fairness_plot: bool) -> str:
         os.makedirs(const.DIR_FIGURES)
     except FileExistsError:
         pass
-    metrics_file_name = metrics_file_name[len(const.DIR_METRICS) + 1:]
-    metrics_file_name = metrics_file_name[:-len(const.FILE_NAME_METRICS) - 1]
-    file_name = os.path.join(const.DIR_FIGURES, f'{metrics_file_name}_{const.FILE_NAME_FIGURES_FAIRNESS if fairness_plot else const.FILE_NAME_FIGURES_ACCURACY}')
-    __move_file_if_exists(file_name)
-    return file_name
+    data_directory = os.path.basename(os.path.dirname(metrics_file_name))
+    try:
+        os.makedirs(os.path.join(const.DIR_FIGURES, data_directory))
+    except FileExistsError:
+        pass
+    base_file_name = os.path.basename(metrics_file_name)
+    base_file_name = base_file_name[:-len(const.FILE_NAME_METRICS) - 1]
+    return os.path.join(const.DIR_FIGURES, data_directory, f'{base_file_name}_{const.FILE_NAME_FIGURES_FAIRNESS if fairness_plot else const.FILE_NAME_FIGURES_ACCURACY}')
 
 # HELPERS (GENERIC)
 
-def __generate_file_prefix(tests: List[Tuple[Tuple[str, str, float, float], float]]) -> str:
+def __generate_file_prefix(data_reader: DataReader, tests: List[Tuple[Tuple[str, str, float, float], float]]) -> str:
     if len(tests) < 2:
         raise ValueError('File name cannot be made from empty or singular list of tests.')
     prefix: str = ''
     if len(set([arg[1] for arg in tests])) > 1:
         prefix = const.COL_CONFIDENCE_THRESHOLD.replace(' ', '-')
-        if tests[0][0][0]:
-            prefix = f'{prefix}_{"non" if tests[0][0][1].startswith("-") else ""}{tests[0][0][1]}'
+        if tests[0][0][1]:
+            sensitive_attribute_values = data_reader.sensitive_attribute_vals(tests[0][0][0])
+            if not tests[0][0][1].startswith('-'):
+                sensitive_attribute_value = tests[0][0][1]
+            elif len(sensitive_attribute_values) > 2:
+                sensitive_attribute_value = f'non{tests[0][0][1]}'
+            else:
+                sensitive_attribute_value = [val for val in sensitive_attribute_values if val != tests[0][0][1].lstrip('-')][0]
+            prefix = f'{prefix}_{sensitive_attribute_value}'
         if tests[0][0][3] == 0:
-            prefix = f'{prefix}_{const.COL_POSITIVE}'
+            prefix = f'{prefix}_{const.COL_QUALIFIED}'
         elif tests[0][0][2] == 0:
-            prefix = f'{prefix}_{const.COL_NEGATIVE}'
+            prefix = f'{prefix}_{const.COL_UNQUALIFIED}'
         if prefix == const.COL_CONFIDENCE_THRESHOLD.replace(' ', '-'):
             prefix = f'{prefix}_{const.COL_UNIFORM}'
     else:
-        if tests[0][0][0]:
-            prefix = f'{"non" if tests[0][0][1].startswith("-") else ""}{tests[0][0][1]}'
+        if tests[0][0][1]:
+            sensitive_attribute_values = data_reader.sensitive_attribute_vals(tests[0][0][0])
+            if not tests[0][0][1].startswith('-'):
+                sensitive_attribute_value = tests[0][0][1]
+            elif len(sensitive_attribute_values) > 2:
+                sensitive_attribute_value = f'non{tests[0][0][1]}'
+            else:
+                sensitive_attribute_value = [val for val in sensitive_attribute_values if val != tests[0][0][1].lstrip('-')][0]
+            prefix = sensitive_attribute_value
         if tests[0][0][2] < tests[-1][0][2] and tests[0][0][3] == tests[-1][0][3]:
-            prefix = f'{prefix}{"_" if prefix else ""}{const.COL_POSITIVE}'
+            prefix = f'{prefix}{"_" if prefix else ""}{const.COL_QUALIFIED}'
         elif tests[0][0][3] < tests[-1][0][3] and tests[0][0][2] == tests[-1][0][2]:
-            prefix = f'{prefix}{"_" if prefix else ""}{const.COL_NEGATIVE}'
+            prefix = f'{prefix}{"_" if prefix else ""}{const.COL_UNQUALIFIED}'
         if not prefix:
             prefix = const.COL_UNIFORM
     prefix = prefix.lower()
