@@ -33,11 +33,11 @@ def get_flippable_indexes(data: pd.DataFrame, labels: pd.Series, flip_rate: Tupl
     """
     if not (is_numeric_dtype(labels) and labels.isin([0,1]).all()):
         raise ValueError('Label column must be a column of integers with values 0 and 1.')
-    if bool(flip_rate[0]) != bool(flip_rate[1]):
-        raise ValueError('Flip rate must contain both a column name and a column value, or neither.')
-    if flip_rate[0] and flip_rate[0] not in data.columns:
+    if not bool(flip_rate[0]):
+        raise ValueError('Flip rate must contain a column name.')
+    if flip_rate[0] not in data.columns:
         raise ValueError(f'Column name {flip_rate[0]} not in data.')
-    if flip_rate[0] and flip_rate[1] and flip_rate[1].lstrip('-') not in data[flip_rate[0]].unique():
+    if flip_rate[1] and flip_rate[1].lstrip('-') not in data[flip_rate[0]].unique():
         raise ValueError(f'Value {flip_rate[1]} does not exist in column {flip_rate[0]}')
     flippable_data = data
     if flip_rate[2] != 0 and flip_rate[3] == 0:
@@ -49,7 +49,7 @@ def get_flippable_indexes(data: pd.DataFrame, labels: pd.Series, flip_rate: Tupl
     col: str = flip_rate[0]
     privileged_val: str = flip_rate[1].lstrip('-')
     is_privileged: bool = not flip_rate[1].startswith('-')
-    flippable_data: pd.DataFrame = flippable_data.loc[(flippable_data[col] == privileged_val) == is_privileged] if flip_rate[0] else flippable_data
+    flippable_data: pd.DataFrame = flippable_data.loc[(flippable_data[col] == privileged_val) == is_privileged] if flip_rate[1] else flippable_data
     return list(flippable_data.index)
 
 def restrict_flippable_indexes(data: pd.DataFrame,

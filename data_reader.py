@@ -223,7 +223,7 @@ class DataReader:
         
         encoder: LabelEncoder = LabelEncoder()
         encoder.fit(list(self.label_negative_positive))
-        labels = encoder.transform(y = labels)
+        labels = encoder.transform(labels)
         
         return df, pd.Series(labels), df[self.sensitive_attributes.keys()]
     
@@ -244,7 +244,7 @@ class DataReader:
         for colName in df.columns:
             if not pd.api.types.is_numeric_dtype(df[colName]):
                 encoder: LabelEncoder = LabelEncoder()
-                df[colName] = encoder.fit_transform(y = df[colName])
+                df[colName] = encoder.fit_transform(df[colName])
         return df
     
     def __read_encoded_dataframe(self, is_test: bool) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame]:

@@ -56,7 +56,7 @@ def generate_metrics_row(data_reader: DataReader, trial_num: int, flip_rate: Tup
     df: pd.DataFrame = pd.DataFrame(columns=__generate_column_names(data_reader, flip_rate))
     values = [trial_num]
     for value in data_reader.sensitive_attribute_vals(flip_rate[0]):
-        if flip_rate[0]:
+        if flip_rate[1]:
             if flip_rate[1].startswith('-'):
                 values.append(flip_rate[2] if flip_rate[1].lstrip('-') != value else 0.0)
                 values.append(flip_rate[3] if flip_rate[1].lstrip('-') != value else 0.0)
