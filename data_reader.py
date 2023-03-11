@@ -218,7 +218,7 @@ class DataReader:
         labels = df[self.label_column_name]
         df = df.loc[:, df.columns != self.label_column_name]
         
-        labels = labels.map(lambda label: label.strip(' .') if type(label) is str else label)
+        labels = labels.map(lambda label: label.strip(' .') if isinstance(label, str) else label)
         
         if len(self.label_unqualified_qualified) != 2:
             raise ValueError('Two values must be provided for qualified/unqualified labels.')

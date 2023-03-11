@@ -6,7 +6,6 @@ from data_reader import DataReader
 import file_handler
 import constants as const
 
-# TODO: add check for if the files already exist
 def plot_all(data_reader: DataReader, tests: List[Tuple[Tuple[str, str, float, float], float]]):
     print('Generating figures...')
     data, file_name = file_handler.read_metrics(data_reader, tests)

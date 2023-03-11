@@ -11,7 +11,7 @@ import file_handler
 def generate_metrics(data_reader: DataReader,
                      tests: List[Tuple[Tuple[str, str, float, float], float]]):
     try:
-        file_handler.read_metrics(tests)
+        file_handler.read_metrics(data_reader, tests)
         print('Metrics found')
         return
     except:
