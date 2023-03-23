@@ -1,6 +1,7 @@
 import dill
 from typing import List, Tuple
 import os
+from matplotlib.axes import Axes
 import pandas as pd
 import constants as const
 import matplotlib.pyplot as plt
@@ -109,6 +110,7 @@ def find_figure_x_column(data: pd.DataFrame) -> str:
 
 def save_figure(metrics_file_name: str, fairness_plot: bool):
     plt.savefig(__get_figure_file_name(metrics_file_name, fairness_plot), bbox_inches = 'tight')
+    plt.close()
 
 # HELPERS (MODELS)
 
@@ -190,6 +192,8 @@ def __generate_file_prefix(data_reader: DataReader, tests: List[Tuple[Tuple[str,
             prefix = f'{prefix}_{const.COL_UNQUALIFIED}'
         if prefix == const.COL_CONFIDENCE_THRESHOLD.replace(' ', '-'):
             prefix = f'{prefix}_{const.COL_UNIFORM}'
+        if not tests[0][0][1]:
+            prefix=  f'{prefix}_{tests[0][0][0].lower()}'
     else:
         if tests[0][0][1]:
             sensitive_attribute_values = data_reader.sensitive_attribute_vals(tests[0][0][0])
@@ -205,7 +209,9 @@ def __generate_file_prefix(data_reader: DataReader, tests: List[Tuple[Tuple[str,
         elif tests[0][0][3] < tests[-1][0][3] and tests[0][0][2] == tests[-1][0][2]:
             prefix = f'{prefix}{"_" if prefix else ""}{const.COL_UNQUALIFIED}'
         if not prefix:
-            prefix = const.COL_UNIFORM
+            prefix = f'{const.COL_UNIFORM}'
+        if not tests[0][0][1]:
+            prefix = f'{prefix}_{tests[0][0][0].lower()}'
     prefix = prefix.lower()
     return prefix
 

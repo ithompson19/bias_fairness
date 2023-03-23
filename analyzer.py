@@ -1,5 +1,6 @@
+from matplotlib.axes import Axes
 import constants as const
-from typing import Tuple
+from typing import List, Tuple
 import multiprocessing as mp
 import model_trainer
 import metric_analyzer
@@ -22,6 +23,41 @@ def all_tests(data_reader: DataReader,
     flip_rate_tests(data_reader, sensitive_attribute_column, flip_min, flip_max, flip_interval, trial_count, cpu_count)
     confidence_threshold_tests(data_reader, sensitive_attribute_column, conf_flip_rate, conf_min, conf_max, conf_interval, trial_count, cpu_count)
 
+def uniform_tests(data_reader: DataReader,
+                  sensitive_attribute_column: str,
+                  flip_min: float = const.LABEL_BIAS_RANGE_MIN,
+                  flip_max: float = const.LABEL_BIAS_RANGE_MAX,
+                  flip_interval: float = const.LABEL_BIAS_RANGE_INTERVAL,
+                  conf_flip_rate: float = const.CONFIDENCE_THRESHOLD_FLIP_RATE,
+                  conf_min: float = const.CONFIDENCE_THRESHOLD_RANGE_MIN,
+                  conf_max: float = const.CONFIDENCE_THRESHOLD_RANGE_MAX,
+                  conf_interval: float = const.CONFIDENCE_THRESHOLD_RANGE_INTERVAL,
+                  trial_count: int = const.TRIAL_COUNT_DEFAULT,
+                  cpu_count: int = mp.cpu_count(),
+                  show_group_plot: bool = False):
+    uniform_flip_rate_tests(data_reader, sensitive_attribute_column, flip_min, flip_max, flip_interval, trial_count, cpu_count)
+    uniform_confidence_threshold_tests(data_reader, sensitive_attribute_column, conf_flip_rate, conf_min, conf_max, conf_interval, trial_count, cpu_count)
+    if show_group_plot:
+        figure_generator.plot_group_accuracy_fairness('Uniform', data_reader, sensitive_attribute_column)
+
+def targeted_tests(is_advantaged: bool,
+                   data_reader: DataReader,
+                   sensitive_attribute_column: str,
+                   flip_min: float = const.LABEL_BIAS_RANGE_MIN,
+                   flip_max: float = const.LABEL_BIAS_RANGE_MAX,
+                   flip_interval: float = const.LABEL_BIAS_RANGE_INTERVAL,
+                   conf_flip_rate: float = const.CONFIDENCE_THRESHOLD_FLIP_RATE,
+                   conf_min: float = const.CONFIDENCE_THRESHOLD_RANGE_MIN,
+                   conf_max: float = const.CONFIDENCE_THRESHOLD_RANGE_MAX,
+                   conf_interval: float = const.CONFIDENCE_THRESHOLD_RANGE_INTERVAL,
+                   trial_count: int = const.TRIAL_COUNT_DEFAULT,
+                   cpu_count: int = mp.cpu_count(),
+                   show_group_plot: bool = False):
+    targeted_flip_rate_tests(is_advantaged, data_reader, sensitive_attribute_column, flip_min, flip_max, flip_interval, trial_count, cpu_count)
+    targeted_confidence_threshold_tests(is_advantaged, data_reader, sensitive_attribute_column, conf_flip_rate, conf_min, conf_max, conf_interval, trial_count, cpu_count)
+    if show_group_plot:
+        figure_generator.plot_group_accuracy_fairness('Uniform', data_reader, sensitive_attribute_column, is_advantaged)
+
 def flip_rate_tests(data_reader: DataReader, 
                     sensitive_attribute_column: str, 
                     flip_min: float = const.LABEL_BIAS_RANGE_MIN,
@@ -41,7 +77,7 @@ def confidence_threshold_tests(data_reader: DataReader,
                                conf_interval: float = const.CONFIDENCE_THRESHOLD_RANGE_INTERVAL,
                                trial_count: int = const.TRIAL_COUNT_DEFAULT,
                                cpu_count: int = mp.cpu_count()):
-    uniform_confidence_interval_tests(data_reader, sensitive_attribute_column, flip_rate, conf_min, conf_max, conf_interval, trial_count, cpu_count)
+    uniform_confidence_threshold_tests(data_reader, sensitive_attribute_column, flip_rate, conf_min, conf_max, conf_interval, trial_count, cpu_count)
     targeted_confidence_threshold_tests(True, data_reader, sensitive_attribute_column, flip_rate, conf_min, conf_max, conf_interval, trial_count, cpu_count)
     targeted_confidence_threshold_tests(False, data_reader, sensitive_attribute_column, flip_rate, conf_min, conf_max, conf_interval, trial_count, cpu_count)
 
@@ -52,7 +88,9 @@ def uniform_flip_rate_tests(data_reader: DataReader,
                             flip_interval: float = const.LABEL_BIAS_RANGE_INTERVAL,
                             trial_count: int = const.TRIAL_COUNT_DEFAULT,
                             cpu_count: int = mp.cpu_count()):
-    tests_to_run = [('Uniform', True, True), ('Qualified', True, False), ('Unqualified', False, True)]
+    tests_to_run = [(f'Uniform ({sensitive_attribute_column})', True, True), 
+                    (f'Qualified ({sensitive_attribute_column})', True, False), 
+                    (f'Unqualified ({sensitive_attribute_column})', False, True)]
     for message, qualified_test, unqualified_test in tests_to_run:
         __flip_rate_test(message=message, 
                          data_reader=data_reader, 
@@ -66,7 +104,7 @@ def uniform_flip_rate_tests(data_reader: DataReader,
                          trial_count=trial_count,
                          cpu_count=cpu_count)
 
-def uniform_confidence_interval_tests(data_reader: DataReader,
+def uniform_confidence_threshold_tests(data_reader: DataReader,
                                       sensitive_attribute_column: str,
                                       flip_rate: float,
                                       conf_min: float = const.CONFIDENCE_THRESHOLD_RANGE_MIN,
@@ -74,7 +112,9 @@ def uniform_confidence_interval_tests(data_reader: DataReader,
                                       conf_interval: float = const.CONFIDENCE_THRESHOLD_RANGE_INTERVAL,
                                       trial_count: int = const.TRIAL_COUNT_DEFAULT,
                                       cpu_count: int = mp.cpu_count()):
-    tests_to_run = [('Uniform', True, True), ('Qualified', True, False), ('Unqualified', False, True)]
+    tests_to_run = [(f'Uniform ({sensitive_attribute_column})', True, True), 
+                    (f'Qualified ({sensitive_attribute_column})', True, False), 
+                    (f'Unqualified ({sensitive_attribute_column})', False, True)]
     for message, qualified_test, unqualified_test in tests_to_run:
         full_flip_rate = (sensitive_attribute_column, 
                           '', 
@@ -109,7 +149,7 @@ def targeted_flip_rate_tests(is_advantaged: bool,
                     (f'{base_message} Qualified', True, False), 
                     (f'{base_message} Unqualified', False, True)]
     for message, qualified_test, unqualified_test in tests_to_run:
-        __flip_rate_test(message=message, 
+        __flip_rate_test(message=message,
                          data_reader=data_reader, 
                          sensitive_attribute_column=sensitive_attribute_column, 
                          sensitive_attribute_value=(advantaged_val if is_advantaged else f'-{advantaged_val}'),
@@ -172,7 +212,7 @@ def __flip_rate_test(message: str,
     tests = tests_generator.generate_flip_rate_tests(range_min, range_max, flip_interval)
     model_trainer.label_bias_train(data_reader, tests, trial_count, cpu_count)
     metric_analyzer.generate_metrics(data_reader, tests)
-    figure_generator.plot_all(data_reader, tests)
+    figure_generator.plot_accuracy_fairness(data_reader, tests)
 
 def __confidence_threshold_test(message: str,
                                 data_reader: DataReader,
@@ -188,4 +228,4 @@ def __confidence_threshold_test(message: str,
     tests = tests_generator.generate_confidence_interval_tests(conf_min, conf_max, conf_interval, flip_rate)
     model_trainer.label_bias_train(data_reader, tests, trial_count, cpu_count)
     metric_analyzer.generate_metrics(data_reader, tests)
-    figure_generator.plot_all(data_reader, tests)
+    figure_generator.plot_accuracy_fairness(data_reader, tests)
