@@ -1,7 +1,7 @@
 import warnings
 
 import analyzer
-from data_reader import DataReader, Adult, Debug, SmallAdultEven, SmallAdultProp
+from data_reader import DataReader, Adult, Debug, SmallAdultEven, SmallAdultProp, RetiringAdultSmall
 
 def main(data_reader: DataReader):
     analyzer.all_tests(data_reader=data_reader, sensitive_attribute_column='Sex')
@@ -9,4 +9,4 @@ def main(data_reader: DataReader):
 
 warnings.filterwarnings('ignore')
 if __name__ == '__main__':
-    main(Adult)
+    main(RetiringAdultSmall)

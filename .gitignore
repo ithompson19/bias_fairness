@@ -3,6 +3,7 @@ Models/*
 Metrics/*
 Figures/*
 Debug/*
+folktables-main/*
 t.py
 
 # https://github.com/github/gitignore/blob/main/Python.gitignore

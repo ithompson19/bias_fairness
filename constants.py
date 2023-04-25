@@ -21,6 +21,31 @@ CONFIDENCE_THRESHOLD_RANGE_INTERVAL: float = 0.1
 CONFIDENCE_THRESHOLD_FLIP_RATE: float = CONFIDENCE_THRESHOLD_RANGE_MIN
 
 # Data Reader
+RetiringAdultSmall_PARAMS = (
+    {
+       'AGEP':np.int64,
+        'SCHL':np.int64,
+        'MAR':np.int64,
+        'RELP':np.int64,
+        'DIS':np.int64,
+        'ESP':np.int64,
+        'CIT':np.int64,
+        'MIG':np.int64,
+        'MIL':np.int64,
+        'ANC':np.int64,
+        'NATIVITY':np.int64,
+        'DEAR':np.int64,
+        'DEYE':np.int64,
+        'DREM':np.int64,
+        'SEX':np.int64,
+        'RAC1P':np.int64, },
+    './Data/RetiringAdult/RetiringAdultSmall.data',
+    0,
+    './Data/RetiringAdult/RetiringAdultSmall.test',
+    1,
+    'ESR',
+    ('<=50K', '>50K'),
+    {'RAC1P': 1, 'SEX': 1})
 ADULT_PARAMS = (
     {
         'Age': np.int64, 
