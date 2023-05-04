@@ -38,13 +38,14 @@ RetiringAdultSmall_PARAMS = (
         'DEYE':np.int64,
         'DREM':np.int64,
         'SEX':np.int64,
-        'RAC1P':np.int64, },
+        'RAC1P':np.int64,
+        'ESR': np.int64, },
     './Data/RetiringAdult/RetiringAdultSmall.data',
     0,
     './Data/RetiringAdult/RetiringAdultSmall.test',
     1,
     'ESR',
-    ('<=50K', '>50K'),
+    ('RAC1P'),
     {'RAC1P': 1, 'SEX': 1})
 ADULT_PARAMS = (
     {
